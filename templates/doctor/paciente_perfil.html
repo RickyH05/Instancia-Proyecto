@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+{% block title %}Perfil Paciente{% endblock %}
+{% block page_title %}Perfil del Paciente{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('doctor_pacientes') }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;display:inline-flex;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver a Pacientes
+</a>
+
+<!-- Header paciente -->
+<div style="background:#ffffff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:20px;">
+  <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+    <div class="patient-avatar" style="width:56px;height:56px;font-size:18px;">
+      {{ paciente.nombre[:2].upper() if paciente.nombre else '??' }}
+    </div>
+    <div style="flex:1;">
+      <h2 style="font-size:20px;font-weight:700;margin-bottom:4px;color:#2C3E50;">{{ paciente.nombre }}</h2>
+      <div style="font-size:12px;color:#5D6D7E;font-family:monospace;margin-bottom:8px;">{{ paciente.curp }}</div>
+      {% if paciente.diagnosticos %}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        {% for dx in paciente.diagnosticos.split(',') %}
+        <span class="badge badge-blue">{{ dx.strip() }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% set adh = paciente.pct|int %}
+    {% set dash = (adh / 100 * 188)|int %}
+    {% set color = '#1ABC9C' if adh >= 80 else ('#F39C12' if adh >= 50 else '#E74C3C') %}
+    <div style="text-align:center;">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="30" fill="none" stroke="#E8ECF0" stroke-width="7"/>
+        <circle cx="40" cy="40" r="30" fill="none" stroke="{{ color }}" stroke-width="7"
+          stroke-linecap="round" stroke-dasharray="{{ dash }} 188" transform="rotate(-90 40 40)"/>
+        <text x="40" y="45" text-anchor="middle" font-size="14" font-weight="700" fill="{{ color }}">{{ adh }}%</text>
+      </svg>
+      <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">Adherencia</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div style="background:#ffffff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+
+  <!-- Tab buttons -->
+  <div style="display:flex;border-bottom:1px solid #E8ECF0;overflow-x:auto;">
+    {% for tab in [
+      ("tab-recetas",  "Recetas",       "clipboard-list"),
+      ("tab-eventos",  "Eventos NFC",   "radio"),
+      ("tab-cuids",    "Cuidadores",    "users"),
+      ("tab-alertas",  "Alertas",       "bell")
+    ] %}
+    <button onclick="showTab('{{ tab[0] }}', this)"
+      id="btn-{{ tab[0] }}"
+      style="display:flex;align-items:center;gap:6px;padding:14px 20px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;min-height:48px;transition:all .18s;
+        {% if loop.first %}color:#1B4F72;border-bottom:2px solid #1B4F72;{% else %}color:#5D6D7E;border-bottom:2px solid transparent;{% endif %}">
+      <i data-lucide="{{ tab[2] }}" style="width:15px;height:15px;"></i> {{ tab[1] }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- ── TAB: Recetas ── -->
+  <div id="tab-recetas" style="padding:20px;display:block;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="font-size:15px;font-weight:600;color:#2C3E50;">Recetas del paciente</h3>
+      <button class="btn btn-primary btn-sm" onclick="openModal('modal-nueva-receta')">
+        <i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva Receta
+      </button>
+    </div>
+    {% for rx in recetas %}
+    <div style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:14px;margin-bottom:10px;
+      border-left:3px solid {% if rx.estado=='vigente' %}#1ABC9C{% elif rx.estado=='cancelada' %}#E74C3C{% else %}#9CA3AF{% endif %};">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+        <div>
+          <div style="font-weight:500;font-size:14px;color:#2C3E50;">{{ rx.inicio }} — {{ rx.medico }}</div>
+          <div style="font-size:12px;color:#5D6D7E;">{{ rx.inicio }} → {{ rx.fin }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="badge {% if rx.estado=='vigente' %}badge-green{% elif rx.estado=='cancelada' %}badge-red{% else %}badge-gray{% endif %}">
+            {{ rx.estado|capitalize }}
+          </span>
+          {% if rx.estado == 'vigente' %}
+          <form method="POST" action="{{ url_for('doctor_receta_cancelar', id_receta=rx.id) }}"
+            style="display:inline;"
+            onsubmit="return confirm('¿Cancelar esta receta? Se marcarán las tomas pendientes como omitidas.')">
+            <input type="hidden" name="id_paciente" value="{{ id }}">
+            <button type="submit" class="btn btn-ghost btn-sm" style="color:#E74C3C;">
+              <i data-lucide="x-circle" style="width:13px;height:13px;"></i> Cancelar
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        {% for m in rx.meds %}
+        <div style="background:#F4F6F8;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;gap:16px;flex-wrap:wrap;">
+          <strong style="color:#2C3E50;">{{ m.nombre }} {{ m.dosis }}{{ m.unidad }}</strong>
+          <span style="color:#5D6D7E;">Cada {{ m.frecuencia_h }}h</span>
+          <span style="color:#5D6D7E;display:flex;align-items:center;gap:3px;">
+            <i data-lucide="clock" style="width:11px;height:11px;"></i> {{ m.hora }}
+          </span>
+          <span style="color:#5D6D7E;">Tolerancia: {{ m.tolerancia }} min</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <p style="font-size:14px;color:#9CA3AF;">Este paciente no tiene recetas.</p>
+    {% endfor %}
+  </div>
+
+  <!-- ── TAB: Eventos NFC ── -->
+  <div id="tab-eventos" style="padding:20px;display:none;">
+    <h3 style="font-size:15px;font-weight:600;color:#2C3E50;margin-bottom:16px;">Eventos NFC (últimos 14 días)</h3>
+    {% if historial %}
+    <div>
+      {% for ev in historial %}
+      {% if ev.resultado == 'Exitoso' %}{% set dot = 'green' %}
+      {% elif ev.resultado == 'Tardío' %}{% set dot = 'yellow' %}
+      {% else %}{% set dot = 'red' %}{% endif %}
+      <div class="timeline-item">
+        <div class="timeline-spine">
+          <div class="timeline-dot {{ dot }}"></div>
+          <div class="timeline-line"></div>
+        </div>
+        <div class="timeline-content">
+          <div class="timeline-card">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+              <span style="font-size:12px;color:#5D6D7E;">{{ ev.timestamp }}</span>
+              <span class="badge {% if ev.resultado=='Exitoso' %}badge-green{% elif ev.resultado=='Tardío' %}badge-yellow{% else %}badge-red{% endif %}">
+                {{ ev.resultado }}
+              </span>
+              {% if ev.desfase_min %}
+              <span style="font-size:11px;color:#9CA3AF;">{{ ev.desfase_min }} min</span>
+              {% endif %}
+            </div>
+            <div style="font-weight:500;font-size:14px;color:#2C3E50;">{{ ev.medicamento }}</div>
+            <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">
+              Por {{ ev.cuidador }} · {{ ev.origen }}
+              {% if not ev.proximidad %}<span style="color:#E74C3C;"> · ⚠️ Fuera de rango</span>{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="font-size:14px;color:#9CA3AF;">Sin eventos NFC en los últimos 14 días.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── TAB: Cuidadores ── -->
+  <div id="tab-cuids" style="padding:20px;display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="font-size:15px;font-weight:600;color:#2C3E50;">Cuidador principal</h3>
+      <a href="{{ url_for('doctor_asignar_cuidador', id=id) }}" class="btn btn-primary btn-sm">
+        <i data-lucide="plus" style="width:14px;height:14px;"></i> Asignar
+      </a>
+    </div>
+    {% if paciente.cuidador %}
+    <div style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:14px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:#1ABC9C;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0;">
+          {{ paciente.cuidador[:2].upper() }}
+        </div>
+        <div style="flex:1;">
+          <div style="font-weight:500;font-size:14px;color:#2C3E50;">{{ paciente.cuidador }}</div>
+        </div>
+        <span class="badge badge-green">Principal</span>
+      </div>
+    </div>
+    {% else %}
+    <p style="font-size:14px;color:#9CA3AF;">Sin cuidador asignado.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── TAB: Alertas ── -->
+  <div id="tab-alertas" style="padding:20px;display:none;">
+    <h3 style="font-size:15px;font-weight:600;color:#2C3E50;margin-bottom:16px;">Alertas del paciente</h3>
+    {% for a in alertas %}
+    <div style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap;">
+        <span class="badge {% if 'Omis' in a.tipo %}badge-red{% else %}badge-yellow{% endif %}">{{ a.tipo }}</span>
+        <span class="badge {% if a.estado == 'Pendiente' %}badge-yellow{% else %}badge-green{% endif %}">{{ a.estado }}</span>
+        <span class="badge {% if a.prioridad == 'Alta' %}badge-red{% elif a.prioridad == 'Media' %}badge-yellow{% else %}badge-green{% endif %}">{{ a.prioridad }}</span>
+      </div>
+      <div style="font-weight:500;font-size:14px;color:#2C3E50;">{{ a.medicamento }}</div>
+      <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">{{ a.timestamp }}</div>
+    </div>
+    {% else %}
+    <p style="font-size:14px;color:#9CA3AF;">Sin alertas registradas.</p>
+    {% endfor %}
+  </div>
+
+</div>
+
+<!-- ════ MODAL NUEVA RECETA ════ -->
+<div id="modal-nueva-receta" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-nueva-receta')">
+  <div class="modal-box" style="max-width:640px;">
+    <div class="modal-header">
+      <span class="modal-title">Nueva Receta — {{ paciente.nombre }}</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-nueva-receta')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('doctor_receta_crear', id=id) }}">
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Fecha emisión *</label>
+            <input class="form-control" type="date" name="fecha_emision" value="2026-04-15" required/>
+          </div>
+          <div class="form-group"><!-- spacer --></div>
+          <div class="form-group">
+            <label class="form-label">Fecha inicio *</label>
+            <input class="form-control" type="date" name="fecha_inicio" value="2026-04-15" required/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fecha fin *</label>
+            <input class="form-control" type="date" name="fecha_fin" value="2026-07-15" required/>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid rgba(0,0,0,.06);padding-top:16px;margin-top:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span style="font-weight:600;font-size:14px;color:#2C3E50;">Medicamentos</span>
+            <button class="btn btn-ghost btn-sm" onclick="addMedPerfil()" type="button">
+              <i data-lucide="plus" style="width:14px;height:14px;"></i> Agregar
+            </button>
+          </div>
+          <div id="meds-list-perfil">
+            <div class="med-row" style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:8px;">
+              <div style="display:grid;grid-template-columns:1fr 80px 80px 80px 80px 80px auto;gap:8px;align-items:end;">
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">ID Medicamento *</label>
+                  <input class="form-control" name="med_id[]" type="number" min="1"
+                    placeholder="ID" style="height:38px;font-size:13px;" required/>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">Dosis</label>
+                  <input class="form-control" name="dosis[]" type="number" min="1"
+                    value="500" style="height:38px;font-size:13px;"/>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">Unidad ID</label>
+                  <input class="form-control" name="unidad[]" type="number" min="1"
+                    value="1" style="height:38px;font-size:13px;"/>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">Frec. (h)</label>
+                  <input class="form-control" name="frecuencia[]" type="number"
+                    value="12" min="1" style="height:38px;font-size:13px;"/>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">Tol. (min)</label>
+                  <input class="form-control" name="tolerancia[]" type="number"
+                    value="30" min="0" style="height:38px;font-size:13px;"/>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">1ª toma</label>
+                  <input class="form-control" name="hora[]" type="time"
+                    value="08:00" style="height:38px;font-size:13px;"/>
+                </div>
+                <button onclick="this.closest('.med-row').remove()" type="button"
+                  style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
+                  <i data-lucide="trash-2" style="width:15px;height:15px;"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-nueva-receta')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:15px;height:15px;"></i> Guardar Receta
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+
+// Tabs
+function showTab(id, btn) {
+  ['tab-recetas','tab-eventos','tab-cuids','tab-alertas'].forEach(function(t) {
+    document.getElementById(t).style.display = 'none';
+    var b = document.getElementById('btn-' + t);
+    if(b){ b.style.color='#5D6D7E'; b.style.borderBottom='2px solid transparent'; }
+  });
+  document.getElementById(id).style.display = 'block';
+  btn.style.color = '#1B4F72';
+  btn.style.borderBottom = '2px solid #1B4F72';
+}
+
+function addMedPerfil() {
+  var list = document.getElementById('meds-list-perfil');
+  var div = document.createElement('div');
+  div.className = 'med-row';
+  div.style.cssText = 'border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:8px;';
+  div.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 80px 80px 80px 80px 80px auto;gap:8px;align-items:end;">
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">ID Medicamento *</label>
+        <input class="form-control" name="med_id[]" type="number" min="1" placeholder="ID" style="height:38px;font-size:13px;" required/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Dosis</label>
+        <input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Unidad ID</label>
+        <input class="form-control" name="unidad[]" type="number" min="1" value="1" style="height:38px;font-size:13px;"/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Frec. (h)</label>
+        <input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Tol. (min)</label>
+        <input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">1ª toma</label>
+        <input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/></div>
+      <button onclick="this.closest('.med-row').remove()" type="button"
+        style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
+        <i data-lucide="trash-2" style="width:15px;height:15px;"></i>
+      </button>
+    </div>`;
+  list.appendChild(div);
+  lucide.createIcons();
+}
+</script>
+{% endblock %}

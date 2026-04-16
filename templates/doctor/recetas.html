@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Recetas{% endblock %}
+{% block page_title %}Recetas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div><h1>Recetas</h1><p>{{ 5 }} prescripciones activas</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-receta')">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nueva Receta
+  </button>
+</div>
+
+<!-- Filtros -->
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+  <select class="form-control" style="max-width:220px;">
+    <option>Todos los pacientes</option>
+    <option>Juan Lopez Martinez</option>
+    <option>Ana Torres Ramirez</option>
+    <option>Carlos Ruiz Sanchez</option>
+    <option>Elena Morales Diaz</option>
+  </select>
+  <div class="filter-pills" style="margin:0;">
+    <span class="pill active">Todas</span>
+    <span class="pill">Vigentes</span>
+    <span class="pill">Vencidas</span>
+    <span class="pill">Canceladas</span>
+  </div>
+</div>
+
+<!-- Lista de recetas -->
+<div style="display:flex;flex-direction:column;gap:14px;">
+  {% for rx in [
+    {"pac":"Juan Lopez Martinez",   "ini":"2026-03-10","fin":"2026-06-10","status":"vigente","meds":[("Metformina 500mg","12h","08:00"),("Losartan 50mg","24h","08:00"),("Atorvastatina 20mg","24h","21:00")]},
+    {"pac":"Ana Torres Ramirez",    "ini":"2026-03-08","fin":"2026-06-08","status":"vigente","meds":[("Enalapril 10mg","12h","07:00"),("Furosemida 40mg","24h","08:00")]},
+    {"pac":"Carlos Ruiz Sanchez",   "ini":"2026-02-01","fin":"2026-05-01","status":"vigente","meds":[("Metformina 500mg","8h","08:00")]},
+    {"pac":"Elena Morales Diaz",    "ini":"2026-03-01","fin":"2026-06-01","status":"vigente","meds":[("Levotiroxina 100mcg","24h","06:00"),("Losartan 50mg","24h","08:00")]},
+    {"pac":"Juan Lopez Martinez",   "ini":"2025-12-01","fin":"2026-03-01","status":"vencida","meds":[("Metformina 500mg","8h","08:00")]}
+  ] %}
+  <div style="background:#ffffff;border-radius:12px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid {% if rx.status=='vigente' %}#1ABC9C{% elif rx.status=='vencida' %}#9CA3AF{% else %}#E74C3C{% endif %};">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-weight:700;font-size:15px;color:#2C3E50;">{{ rx.pac }}</div>
+        <div style="font-size:13px;color:#5D6D7E;margin-top:2px;">
+          Dr. Alejandro Garcia &nbsp;·&nbsp; {{ rx.ini }} → {{ rx.fin }}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge {% if rx.status=='vigente' %}badge-green{% elif rx.status=='vencida' %}badge-gray{% else %}badge-red{% endif %}">
+          {{ rx.status|capitalize }}
+        </span>
+        <button class="btn btn-ghost btn-sm" onclick="openModal('modal-receta')" title="Editar">
+          <i data-lucide="edit-2" style="width:14px;height:14px;"></i>
+        </button>
+      </div>
+    </div>
+    <!-- Medicamentos -->
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      {% for m in rx.meds %}
+      <div style="background:#F4F6F8;border-radius:6px;padding:8px 14px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+        <span style="font-weight:600;font-size:13px;color:#2C3E50;">{{ m[0] }}</span>
+        <span style="font-size:12px;color:#5D6D7E;">Cada {{ m[1] }}</span>
+        <span style="font-size:12px;color:#5D6D7E;display:flex;align-items:center;gap:4px;">
+          <i data-lucide="clock" style="width:12px;height:12px;"></i> {{ m[2] }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- MODAL Nueva Receta -->
+<div id="modal-receta" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-receta')">
+  <div class="modal-box" style="max-width:600px;">
+    <div class="modal-header">
+      <span class="modal-title">Nueva Receta</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-receta')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Datos generales -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
+        <div class="form-group">
+          <label class="form-label">Paciente *</label>
+          <select class="form-control">
+            <option value="">— Seleccionar —</option>
+            <option>Juan Lopez Martinez</option>
+            <option>Ana Torres Ramirez</option>
+            <option>Carlos Ruiz Sanchez</option>
+            <option>Elena Morales Diaz</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Medico</label>
+          <input class="form-control" value="Dr. Alejandro Garcia" readonly style="background:#F4F6F8;"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha inicio *</label>
+          <input class="form-control" type="date" value="2026-03-24"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha fin *</label>
+          <input class="form-control" type="date" value="2026-06-24"/>
+        </div>
+      </div>
+
+      <!-- Medicamentos -->
+      <div style="border-top:1px solid rgba(0,0,0,.06);padding-top:16px;margin-top:4px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="font-weight:600;font-size:14px;color:#2C3E50;">Medicamentos</span>
+          <button class="btn btn-ghost btn-sm" onclick="addMed()" type="button">
+            <i data-lucide="plus" style="width:14px;height:14px;"></i> Agregar
+          </button>
+        </div>
+        <div id="meds-list">
+          <!-- Medicamento 1 -->
+          <div class="med-row" style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:10px;">
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Medicamento *</label>
+                <select class="form-control" style="height:38px;font-size:13px;">
+                  <option value="">— Seleccionar —</option>
+                  <option>Metformina 500mg</option>
+                  <option>Losartan 50mg</option>
+                  <option>Atorvastatina 20mg</option>
+                  <option>Enalapril 10mg</option>
+                  <option>Furosemida 40mg</option>
+                  <option>Levotiroxina 100mcg</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Frecuencia</label>
+                <select class="form-control" style="height:38px;font-size:13px;">
+                  <option>Cada 4h</option>
+                  <option>Cada 6h</option>
+                  <option>Cada 8h</option>
+                  <option selected>Cada 12h</option>
+                  <option>Cada 24h</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Primera toma</label>
+                <input class="form-control" type="time" value="08:00" style="height:38px;font-size:13px;"/>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Tolerancia</label>
+                <select class="form-control" style="height:38px;font-size:13px;">
+                  <option>15 min</option>
+                  <option selected>30 min</option>
+                  <option>45 min</option>
+                  <option>60 min</option>
+                </select>
+              </div>
+              <button onclick="this.closest('.med-row').remove()" type="button"
+                style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
+                <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-receta')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-receta')">
+        <i data-lucide="save" style="width:15px;height:15px;"></i> Crear Receta
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+
+function addMed() {
+  var list = document.getElementById('meds-list');
+  var div = document.createElement('div');
+  div.className = 'med-row';
+  div.style.cssText = 'border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:10px;';
+  div.innerHTML = `
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="font-size:11px;">Medicamento *</label>
+        <select class="form-control" style="height:38px;font-size:13px;">
+          <option value="">— Seleccionar —</option>
+          <option>Metformina 500mg</option>
+          <option>Losartan 50mg</option>
+          <option>Atorvastatina 20mg</option>
+          <option>Enalapril 10mg</option>
+          <option>Furosemida 40mg</option>
+          <option>Levotiroxina 100mcg</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="font-size:11px;">Frecuencia</label>
+        <select class="form-control" style="height:38px;font-size:13px;">
+          <option>Cada 4h</option><option>Cada 6h</option><option>Cada 8h</option>
+          <option selected>Cada 12h</option><option>Cada 24h</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="font-size:11px;">Primera toma</label>
+        <input class="form-control" type="time" value="08:00" style="height:38px;font-size:13px;"/>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" style="font-size:11px;">Tolerancia</label>
+        <select class="form-control" style="height:38px;font-size:13px;">
+          <option>15 min</option><option selected>30 min</option>
+          <option>45 min</option><option>60 min</option>
+        </select>
+      </div>
+      <button onclick="this.closest('.med-row').remove()" type="button"
+        style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
+        <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+      </button>
+    </div>`;
+  list.appendChild(div);
+  lucide.createIcons();
+}
+</script>
+{% endblock %}

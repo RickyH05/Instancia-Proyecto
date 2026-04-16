@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Usuarios{% endblock %}
+{% block page_title %}Usuarios{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Usuarios del sistema</h1><p>Cuentas de acceso vinculadas a medicos y cuidadores</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-usuario')">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nuevo usuario
+  </button>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por email o rol..."/>
+  </div>
+  <div class="filter-pills" style="margin:0;">
+    <span class="pill active">Todos</span>
+    <span class="pill">Medicos</span>
+    <span class="pill">Cuidadores</span>
+    <span class="pill">Activos</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Email</th><th>Rol</th><th>ID vinculado</th><th>Estado</th><th>Ultimo acceso</th>
+      </tr></thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr data-searchable>
+          <td style="font-weight:500;">{{ u[1] }}</td>
+          <td>
+            {% if u[2] == 'medico' %}
+              <span class="badge badge-blue">Medico</span>
+            {% else %}
+              <span class="badge badge-green">Cuidador</span>
+            {% endif %}
+          </td>
+          <td style="font-family:monospace;font-size:13px;color:#5D6D7E;">{{ u[3] or '—' }}</td>
+          <td>
+            {% if u[4] %}<span class="badge badge-green">Activo</span>
+            {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
+          </td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ u[5] or 'Nunca' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:32px;">No hay usuarios registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nuevo usuario -->
+<div id="modal-usuario" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-usuario')">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <span class="modal-title">Nuevo usuario</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-usuario')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_usuarios') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Email *</label>
+          <input class="form-control" name="email" type="text" placeholder="usuario@medinfc.com" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contrasena *</label>
+          <input class="form-control" name="password" type="password" placeholder="Minimo 8 caracteres" required/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Rol *</label>
+            <select class="form-control" name="rol" id="sel-rol" onchange="updateIdPlaceholder()" required>
+              <option value="">Seleccionar...</option>
+              <option value="medico">Medico</option>
+              <option value="cuidador">Cuidador</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" id="lbl-id-rol">ID de medico / cuidador *</label>
+            <input class="form-control" name="id_rol" id="inp-id-rol" type="number" placeholder="ID numerico" required/>
+          </div>
+        </div>
+        <div style="padding:12px;background:rgba(27,79,114,.06);border-radius:8px;font-size:13px;color:#5D6D7E;line-height:1.6;">
+          <i data-lucide="info" style="width:13px;height:13px;display:inline;margin-right:4px;color:#1B4F72;"></i>
+          El medico o cuidador debe existir previamente en el sistema antes de crear su usuario.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-usuario')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Crear usuario
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>
+lucide.createIcons();
+function updateIdPlaceholder(){
+  var rol = document.getElementById('sel-rol').value;
+  document.getElementById('lbl-id-rol').textContent = rol === 'medico' ? 'ID de medico *' : rol === 'cuidador' ? 'ID de cuidador *' : 'ID numerico *';
+}
+</script>{% endblock %}

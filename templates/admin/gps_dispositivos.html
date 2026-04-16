@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Dispositivos GPS{% endblock %}
+{% block page_title %}Dispositivos GPS{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Dispositivos GPS</h1><p>Dispositivos GPS asignados a cuidadores</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-gps');setModoNuevo()">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Registrar Dispositivo
+  </button>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por IMEI, modelo o cuidador..."/>
+  </div>
+  <div class="filter-pills" style="margin:0;">
+    <span class="pill active">Todos</span>
+    <span class="pill">Activos</span>
+    <span class="pill">Sin asignar</span>
+    <span class="pill">Inactivos</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>IMEI</th><th>Modelo</th><th>Cuidador asignado</th>
+        <th>Ultima ubicacion</th><th>Estado</th><th style="text-align:right;">Acciones</th>
+      </tr></thead>
+      <tbody>
+        {% for d in [
+          {"id":"gps1","imei":"356938035643809","modelo":"Queclink GL300",
+           "cuid":"Maria Gomez Flores",     "upd":"2026-03-24 09:15","status":"active"},
+          {"id":"gps2","imei":"356938035644501","modelo":"Teltonika FMB920",
+           "cuid":"Roberto Hernandez Diaz", "upd":"2026-03-24 09:10","status":"active"},
+          {"id":"gps3","imei":"356938035645102","modelo":"Queclink GL300",
+           "cuid":"Lucia Fernandez Rios",   "upd":"2026-03-24 08:55","status":"active"},
+          {"id":"gps4","imei":"356938035645903","modelo":"Concox GT06N",
+           "cuid":"",                       "upd":"","status":"unassigned"},
+          {"id":"gps5","imei":"356938035646704","modelo":"Teltonika FMB920",
+           "cuid":"",                       "upd":"2026-03-20 14:30","status":"inactive"}
+        ] %}
+        <tr data-searchable>
+          <td style="font-family:monospace;font-size:12px;font-weight:500;">{{ d.imei }}</td>
+          <td style="font-size:14px;">{{ d.modelo }}</td>
+          <td style="font-size:13px;color:{% if d.cuid %}#2C3E50{% else %}#9CA3AF{% endif %};">
+            {{ d.cuid if d.cuid else '— Sin asignar —' }}
+          </td>
+          <td>
+            {% if d.upd %}
+              <div style="display:flex;align-items:center;gap:5px;">
+                <i data-lucide="map-pin" style="width:12px;height:12px;color:#1ABC9C;"></i>
+                <span style="font-size:12px;color:#5D6D7E;">{{ d.upd }}</span>
+              </div>
+            {% else %}
+              <span style="font-size:12px;color:#9CA3AF;font-style:italic;">Sin registro</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if d.status=='active' %}<span class="badge badge-green">Activo</span>
+            {% elif d.status=='unassigned' %}<span class="badge badge-yellow">Sin asignar</span>
+            {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
+              onclick="editGPS('{{ d.id }}','{{ d.imei }}','{{ d.modelo }}','{{ d.cuid }}')">
+              <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </button>
+            <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
+              onclick="openConfirm('Eliminar dispositivo IMEI {{ d.imei }}?','Se eliminara el dispositivo y su historial de ubicaciones.')">
+              <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nuevo / editar GPS -->
+<div id="modal-gps" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-gps')">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-gps-title">Registrar Dispositivo GPS</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-gps')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">IMEI *</label>
+        <input class="form-control" id="g-imei" style="font-family:monospace;" placeholder="356938035640000"/>
+        <small style="color:#5D6D7E;font-size:12px;">15 digitos del dispositivo GPS</small>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Modelo *</label>
+        <select class="form-control" id="g-modelo">
+          <option>Queclink GL300</option>
+          <option>Teltonika FMB920</option>
+          <option>Concox GT06N</option>
+          <option>Coban GPS103</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Asignar a Cuidador</label>
+        <select class="form-control" id="g-cuid">
+          <option value="">— Sin asignar —</option>
+          <option>Maria Gomez Flores</option>
+          <option>Roberto Hernandez Diaz</option>
+          <option>Lucia Fernandez Rios</option>
+          <option>Pedro Salazar Mora</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-gps')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-gps')">
+        <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmar eliminar -->
+<div id="modal-confirm" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-confirm')">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#E74C3C;">Confirmar eliminacion</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-confirm')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+        </div>
+        <div>
+          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
+          <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
+        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>
+lucide.createIcons();
+function setModoNuevo(){
+  document.getElementById('modal-gps-title').textContent='Registrar Dispositivo GPS';
+  document.getElementById('g-imei').value='';
+  document.getElementById('g-cuid').value='';
+}
+function editGPS(id,imei,modelo,cuid){
+  document.getElementById('modal-gps-title').textContent='Editar Dispositivo GPS';
+  document.getElementById('g-imei').value=imei;
+  document.getElementById('g-modelo').value=modelo;
+  document.getElementById('g-cuid').value=cuid;
+  openModal('modal-gps'); lucide.createIcons();
+}
+function openConfirm(title,msg){
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  openModal('modal-confirm'); lucide.createIcons();
+}
+</script>{% endblock %}

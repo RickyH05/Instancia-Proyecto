@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Médico{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:6px;"><p style="font-size:14px;color:#5D6D7E;">Resumen de los últimos 14 días.</p></div>
+
+<div class="stats-grid stats-grid-4">
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Pacientes activos</div>
+      <div class="stat-value" style="color:#1B4F72;">{{ stats.total_pac }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);">
+      <i data-lucide="users" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Alertas pendientes</div>
+      <div class="stat-value" style="color:#E74C3C;">{{ stats.alertas_pend }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(231,76,60,.10);">
+      <i data-lucide="alert-triangle" style="width:22px;height:22px;color:#E74C3C;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Bajo 80% adherencia</div>
+      <div class="stat-value" style="color:#F39C12;">{{ stats.bajo_80 }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(243,156,18,.10);">
+      <i data-lucide="trending-down" style="width:22px;height:22px;color:#F39C12;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Ver alertas</div>
+      <div class="stat-value" style="color:#1ABC9C;font-size:16px;margin-top:6px;">
+        <a href="{{ url_for('doctor_alertas') }}" class="btn btn-ghost btn-sm">Ir →</a>
+      </div>
+    </div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);">
+      <i data-lucide="bell" style="width:22px;height:22px;color:#1ABC9C;"></i>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
+  <!-- Alertas recientes -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Alertas recientes</h3>
+      <a href="{{ url_for('doctor_alertas') }}" class="btn btn-ghost btn-sm">Ver todas →</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Paciente</th><th>Medicamento</th><th>Tipo</th><th>Estado</th></tr></thead>
+        <tbody>
+          {% for a in alertas_rec %}
+          <tr>
+            <td style="font-weight:500;">{{ a.paciente }}</td>
+            <td style="font-size:13px;color:#5D6D7E;">{{ a.medicamento }}</td>
+            <td>
+              <span class="badge {% if 'Omis' in a.tipo %}badge-red{% else %}badge-yellow{% endif %}">
+                {{ a.tipo }}
+              </span>
+            </td>
+            <td>
+              <span class="badge {% if a.estado == 'Pendiente' %}badge-yellow{% else %}badge-green{% endif %}">
+                {{ a.estado }}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="text-align:center;color:#9CA3AF;font-size:13px;">Sin alertas recientes</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Adherencia pacientes -->
+  <div class="card">
+    <div class="card-header"><h3>Adherencia pacientes</h3></div>
+    <div class="card-body">
+      {% for p in adherencia %}
+      {% set adh = p.pct|int %}
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+          <span style="font-size:13px;font-weight:500;">{{ p.nombre }}</span>
+        </div>
+        <div class="adherence-bar">
+          <div class="adherence-track">
+            <div class="adherence-fill" data-value="{{ adh }}"></div>
+          </div>
+          <span class="adherence-label" style="color:{% if adh >= 80 %}#1ABC9C{% elif adh >= 50 %}#F39C12{% else %}#E74C3C{% endif %};">{{ adh }}%</span>
+        </div>
+      </div>
+      {% else %}
+      <p style="font-size:13px;color:#9CA3AF;">Sin datos de adherencia.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

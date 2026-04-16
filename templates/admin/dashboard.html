@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Admin{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid stats-grid-4">
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Médicos activos</div>
+      <div class="stat-value" style="color:#1B4F72;">4</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);">
+      <i data-lucide="stethoscope" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Cuidadores activos</div>
+      <div class="stat-value" style="color:#1ABC9C;">6</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);">
+      <i data-lucide="users" style="width:22px;height:22px;color:#1ABC9C;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Medicamentos en catálogo</div>
+      <div class="stat-value" style="color:#8E44AD;">10</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(142,68,173,.12);">
+      <i data-lucide="pill" style="width:22px;height:22px;color:#8E44AD;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Pacientes activos</div>
+      <div class="stat-value" style="color:#27AE60;">5</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(39,174,96,.12);">
+      <i data-lucide="user-check" style="width:22px;height:22px;color:#27AE60;"></i>
+    </div>
+  </div>
+</div>
+
+<!-- Dispositivos IoT -->
+<div class="stats-grid stats-grid-3" style="margin-bottom:24px;">
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Dispositivos GPS activos</div>
+      <div class="stat-value" style="color:#1B4F72;">3</div>
+      <div class="stat-sub">de 5 asignados</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.08);">
+      <i data-lucide="smartphone" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Beacons BLE activos</div>
+      <div class="stat-value" style="color:#1ABC9C;">4</div>
+      <div class="stat-sub">instalados en domicilios</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);">
+      <i data-lucide="radio" style="width:22px;height:22px;color:#1ABC9C;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Alertas pendientes</div>
+      <div class="stat-value" style="color:#E74C3C;">2</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(231,76,60,.10);">
+      <i data-lucide="bell" style="width:22px;height:22px;color:#E74C3C;"></i>
+    </div>
+  </div>
+</div>
+
+<!-- Actividad reciente -->
+<div class="card">
+  <div class="card-header">
+    <h3>Actividad reciente</h3>
+    <a href="{{ url_for('admin_auditoria') }}" class="btn btn-ghost btn-sm">Ver todo →</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Usuario</th><th>Operación</th><th>Tabla afectada</th><th>Fecha/Hora</th>
+      </tr></thead>
+      <tbody>
+        <tr data-searchable>
+          <td>sys_nfc</td>
+          <td><span class="badge badge-green">INSERT</span></td>
+          <td style="font-family:monospace;font-size:13px;">EVENTO_NFC</td>
+          <td style="color:#5D6D7E;font-size:13px;">2026-03-24 08:05</td>
+        </tr>
+        <tr data-searchable>
+          <td>admin_01</td>
+          <td><span class="badge badge-yellow">UPDATE</span></td>
+          <td style="font-family:monospace;font-size:13px;">RECETA</td>
+          <td style="color:#5D6D7E;font-size:13px;">2026-03-24 09:00</td>
+        </tr>
+        <tr data-searchable>
+          <td>sys_trigger</td>
+          <td><span class="badge badge-green">INSERT</span></td>
+          <td style="font-family:monospace;font-size:13px;">ALERTA</td>
+          <td style="color:#5D6D7E;font-size:13px;">2026-03-24 08:15</td>
+        </tr>
+        <tr data-searchable>
+          <td>admin_01</td>
+          <td><span class="badge badge-red">DELETE</span></td>
+          <td style="font-family:monospace;font-size:13px;">ETIQUETA_NFC</td>
+          <td style="color:#5D6D7E;font-size:13px;">2026-03-23 15:30</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Ranking de Mejora{% endblock %}
+{% block page_title %}Ranking de Mejora{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Ranking de mejora de adherencia</h1><p>Comparativa de los ultimos 14 dias vs los 14 anteriores</p></div>
+</div>
+
+<form method="GET" action="{{ url_for('admin_reporte_ranking') }}"
+      style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+  <div class="filter-pills" style="margin:0;">
+    <a href="{{ url_for('admin_reporte_ranking') }}"
+       class="pill {% if not rol_filtro %}active{% endif %}">Todos</a>
+    <a href="{{ url_for('admin_reporte_ranking', rol='medico') }}"
+       class="pill {% if rol_filtro=='medico' %}active{% endif %}">Medicos</a>
+    <a href="{{ url_for('admin_reporte_ranking', rol='cuidador') }}"
+       class="pill {% if rol_filtro=='cuidador' %}active{% endif %}">Cuidadores</a>
+  </div>
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por nombre..."/>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="text-align:center;">#</th>
+        <th>Nombre</th>
+        <th>Rol</th>
+        <th style="text-align:center;">% anterior</th>
+        <th style="text-align:center;">% reciente</th>
+        <th style="text-align:center;">Delta</th>
+        <th>Clasificacion</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-searchable>
+          <td style="text-align:center;font-weight:700;color:{% if r[6]==1 %}#F39C12{% elif r[6]==2 %}#9CA3AF{% elif r[6]==3 %}#CD7F32{% else %}#D1D5DB{% endif %};">
+            {{ r[6] }}
+          </td>
+          <td style="font-weight:500;">{{ r[2] }}</td>
+          <td>
+            {% if r[0] == 'medico' %}
+              <span class="badge badge-blue">Medico</span>
+            {% else %}
+              <span class="badge badge-green">Cuidador</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;font-size:13px;color:#5D6D7E;">{{ "%.1f"|format(r[3]|float if r[3] else 0) }}%</td>
+          <td style="text-align:center;font-size:13px;font-weight:600;">{{ "%.1f"|format(r[4]|float if r[4] else 0) }}%</td>
+          <td style="text-align:center;">
+            {% set delta = r[5]|float if r[5] else 0 %}
+            <span style="font-size:13px;font-weight:600;color:{% if delta > 0 %}#16a085{% elif delta < 0 %}#c0392b{% else %}#5D6D7E{% endif %};">
+              {% if delta > 0 %}▲ +{% elif delta < 0 %}▼ {% else %}— {% endif %}{{ "%.1f"|format(delta|abs) }}%
+            </span>
+          </td>
+          <td>
+            {% if 'MEJORA SIGNIFICATIVA' in r[9] %}
+              <span class="badge badge-green">{{ r[9] }}</span>
+            {% elif 'MEJORA' in r[9] %}
+              <span class="badge" style="background:rgba(26,188,156,.1);color:#16a085;">{{ r[9] }}</span>
+            {% elif 'DECLIVE SIGNIFICATIVO' in r[9] %}
+              <span class="badge badge-red">{{ r[9] }}</span>
+            {% elif 'DECLIVE' in r[9] %}
+              <span class="badge badge-yellow">{{ r[9] }}</span>
+            {% else %}
+              <span class="badge badge-gray">{{ r[9] }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:32px;">Sin datos de ranking disponibles.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

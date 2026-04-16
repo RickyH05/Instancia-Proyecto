@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Inicio — Cuidador{% endblock %}
+{% block page_title %}Inicio{% endblock %}
+{% block content %}
+<div style="margin-bottom:20px;">
+  <p style="font-size:14px;color:#5D6D7E;">{{ fecha_hoy }}</p>
+</div>
+<div class="stats-grid stats-grid-3" style="margin-bottom:24px;">
+  <div class="stat-card">
+    <div><div class="stat-label">Pacientes hoy</div><div class="stat-value" style="color:#1B4F72;">{{ pacientes|length }}</div></div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);"><i data-lucide="users" style="width:22px;height:22px;color:#1B4F72;"></i></div>
+  </div>
+  <div class="stat-card">
+    <div><div class="stat-label">Tomas registradas</div><div class="stat-value" style="color:#1ABC9C;">{{ stats.tomas_ok }}</div></div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);"><i data-lucide="check-circle" style="width:22px;height:22px;color:#1ABC9C;"></i></div>
+  </div>
+  <div class="stat-card">
+    <div><div class="stat-label">Alertas pendientes</div><div class="stat-value" style="color:#E74C3C;">{{ stats.alertas_pend }}</div></div>
+    <div class="stat-icon" style="background:rgba(231,76,60,.10);"><i data-lucide="bell" style="width:22px;height:22px;color:#E74C3C;"></i></div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header">
+    <h3>Mi Dispositivo GPS</h3>
+    <a href="{{ url_for('cuidador_mi_gps') }}" class="btn btn-ghost btn-sm">Ver detalle →</a>
+  </div>
+  <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+    <div style="width:48px;height:48px;border-radius:12px;background:rgba(26,188,156,.12);display:flex;align-items:center;justify-content:center;">
+      <i data-lucide="map-pin" style="width:24px;height:24px;color:#1ABC9C;"></i>
+    </div>
+    <div style="flex:1;">
+      <div style="font-weight:600;font-size:14px;">Queclink GL300 · <span style="font-family:monospace;font-weight:400;font-size:13px;">356938035643809</span></div>
+      <div style="font-size:13px;color:#5D6D7E;margin-top:2px;">Última posición: En domicilio Juan López · 09:15</div>
+    </div>
+    <span class="badge badge-green">Activo</span>
+  </div>
+</div>
+
+<h2 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin-bottom:14px;">Mis Pacientes</h2>
+{% if pacientes %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+  {% for p in pacientes %}
+  {% set adh = ((p.tomas_ok / p.total_tomas) * 100)|int if p.total_tomas > 0 else 0 %}
+  <a href="{{ url_for('cuidador_paciente', id=p.id) }}" class="patient-card">
+    <div style="flex:1;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div class="patient-avatar" style="width:36px;height:36px;font-size:12px;">{{ p.nombre[:2].upper() }}</div>
+        <div style="font-weight:600;font-size:14px;">{{ p.nombre }}</div>
+        {% if p.alertas > 0 %}
+        <span style="margin-left:auto;font-size:16px;">🔴</span>
+        {% else %}
+        <span style="margin-left:auto;font-size:16px;">🟢</span>
+        {% endif %}
+      </div>
+      <div style="font-size:12px;color:#5D6D7E;margin-bottom:8px;">
+        {{ p.meds }} medicamentos{% if p.next %} · Próxima: {{ p.next }}{% endif %}
+      </div>
+      <div class="adherence-bar">
+        <div class="adherence-track"><div class="adherence-fill" data-value="{{ adh }}"></div></div>
+        <span class="adherence-label" style="font-size:12px;color:{% if adh >= 80 %}#1ABC9C{% elif adh >= 50 %}#F39C12{% else %}#E74C3C{% endif %};">{{ adh }}%</span>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p style="font-size:14px;color:#5D6D7E;">No hay pacientes asignados para hoy.</p>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

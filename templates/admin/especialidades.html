@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Especialidades{% endblock %}
+{% block page_title %}Especialidades{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Especialidades</h1><p>Especialidades medicas del sistema</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-esp')">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nueva
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Descripcion</th><th>Medicos asignados</th><th>Estado</th>
+        <th style="text-align:right;">Acciones</th>
+      </tr></thead>
+      <tbody>
+        {% for e in [
+          {"id":1,"desc":"Geriatria",        "doc":2,"activo":true},
+          {"id":2,"desc":"Cardiologia",      "doc":1,"activo":true},
+          {"id":3,"desc":"Medicina Interna", "doc":1,"activo":true},
+          {"id":4,"desc":"Neurologia",       "doc":1,"activo":true},
+          {"id":5,"desc":"Endocrinologia",   "doc":0,"activo":true},
+          {"id":6,"desc":"Reumatologia",     "doc":0,"activo":false}
+        ] %}
+        <tr data-searchable>
+          <td style="color:#9CA3AF;font-size:13px;">{{ e.id }}</td>
+          <td style="font-weight:500;">{{ e.desc }}</td>
+          <td style="text-align:center;">
+            <span style="font-size:13px;color:#2C3E50;font-weight:500;">{{ e.doc }}</span>
+          </td>
+          <td>
+            {% if e.activo %}<span class="badge badge-green">Activo</span>
+            {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
+          </td>
+          <td style="text-align:right;">
+            <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
+              onclick="openModal('modal-esp')">
+              <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </button>
+            <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
+              onclick="openConfirm('¿Eliminar especialidad {{ e.desc }}?','Esta accion no se puede deshacer.')">
+              <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nueva/editar especialidad -->
+<div id="modal-esp" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-esp')">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">Nueva Especialidad</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-esp')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Descripcion *</label>
+        <input class="form-control" placeholder="Ej: Geriatria"/>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:12px;">
+        <label class="form-label" style="margin:0;">Activo</label>
+        <input type="checkbox" checked style="width:18px;height:18px;accent-color:#1B4F72;cursor:pointer;"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-esp')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-esp')">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmar eliminar -->
+<div id="modal-confirm" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-confirm')">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#E74C3C;">Confirmar eliminacion</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-confirm')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <div style="width:44px;height:44px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="alert-triangle" style="width:22px;height:22px;color:#E74C3C;"></i>
+        </div>
+        <div>
+          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:4px;"></div>
+          <div id="confirm-msg" style="font-size:14px;color:#5D6D7E;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
+        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+lucide.createIcons();
+function openConfirm(title, msg) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  openModal('modal-confirm');
+  lucide.createIcons();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Dispositivos IoT{% endblock %}
+{% block page_title %}Dispositivos IoT{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Dispositivos IoT</h1><p>Vista combinada de GPS y Beacons BLE registrados</p></div>
+  <div style="display:flex;gap:8px;">
+    <a href="{{ url_for('admin_gps') }}" class="btn btn-ghost btn-sm">
+      <i data-lucide="smartphone" style="width:14px;height:14px;"></i> Gestionar GPS
+    </a>
+    <a href="{{ url_for('admin_beacon') }}" class="btn btn-primary btn-sm">
+      <i data-lucide="radio" style="width:14px;height:14px;"></i> Gestionar Beacons
+    </a>
+  </div>
+</div>
+
+<div class="stats-grid stats-grid-3" style="margin-bottom:24px;">
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Total dispositivos</div>
+      <div class="stat-value" style="color:#1B4F72;">{{ dispositivos|length }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);">
+      <i data-lucide="cpu" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">GPS activos</div>
+      <div class="stat-value" style="color:#1ABC9C;">
+        {{ dispositivos|selectattr(0,'equalto','GPS')|selectattr(4,'equalto',true)|list|length }}
+      </div>
+    </div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);">
+      <i data-lucide="smartphone" style="width:22px;height:22px;color:#1ABC9C;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Beacons activos</div>
+      <div class="stat-value" style="color:#8E44AD;">
+        {{ dispositivos|selectattr(0,'equalto','BEACON')|selectattr(4,'equalto',true)|list|length }}
+      </div>
+    </div>
+    <div class="stat-icon" style="background:rgba(142,68,173,.12);">
+      <i data-lucide="radio" style="width:22px;height:22px;color:#8E44AD;"></i>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por identificador o nombre..."/>
+  </div>
+  <div class="filter-pills" style="margin:0;">
+    <span class="pill active">Todos</span>
+    <span class="pill">GPS</span>
+    <span class="pill">Beacon</span>
+    <span class="pill">Activos</span>
+    <span class="pill">Inactivos</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Tipo</th><th>ID</th><th>Identificador</th><th>Nombre / Modelo</th>
+        <th>Asignado a</th><th>Estado</th>
+      </tr></thead>
+      <tbody>
+        {% for d in dispositivos %}
+        <tr data-searchable>
+          <td>
+            {% if d[0] == 'GPS' %}
+              <span class="badge badge-blue"><i data-lucide="smartphone" style="width:11px;height:11px;display:inline;margin-right:3px;"></i>GPS</span>
+            {% else %}
+              <span class="badge" style="background:rgba(142,68,173,.12);color:#8E44AD;"><i data-lucide="radio" style="width:11px;height:11px;display:inline;margin-right:3px;"></i>Beacon</span>
+            {% endif %}
+          </td>
+          <td style="color:#9CA3AF;font-size:12px;">{{ d[1] }}</td>
+          <td style="font-family:monospace;font-size:13px;font-weight:500;">{{ d[2] }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ d[3] or '—' }}</td>
+          <td style="font-size:13px;">{{ d[4] or '—' }}</td>
+          <td>
+            {% if d[4] %}
+              <span class="badge badge-green">Activo</span>
+            {% else %}
+              <span class="badge badge-gray">Inactivo</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:32px;">No hay dispositivos registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

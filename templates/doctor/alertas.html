@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Alertas{% endblock %}
+{% block page_title %}Alertas{% endblock %}
+{% block content %}
+
+<div style="margin-bottom:6px;">
+  <p style="font-size:14px;color:#5D6D7E;">
+    {{ alertas|length }} alerta{{ 's' if alertas|length != 1 }} — {{ 'pendientes' if filtro == 'pendientes' else 'todas' }}
+  </p>
+</div>
+
+<div class="filter-pills" style="margin-bottom:16px;">
+  <a href="{{ url_for('doctor_alertas', filtro='pendientes') }}"
+    class="pill {% if filtro == 'pendientes' %}active{% endif %}">Pendientes</a>
+  <a href="{{ url_for('doctor_alertas', filtro='todas') }}"
+    class="pill {% if filtro == 'todas' %}active{% endif %}">Todas</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Paciente</th><th>Medicamento</th><th>Tipo</th><th>Fecha/Hora</th>
+        <th>Prioridad</th><th>Estado</th><th style="text-align:right;">Acciones</th>
+      </tr></thead>
+      <tbody>
+        {% for a in alertas %}
+        {% set es_pend = a.estado == 'Pendiente' %}
+        <tr data-searchable>
+          <td style="font-weight:500;">{{ a.paciente }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ a.medicamento }}</td>
+          <td>
+            <span class="badge {% if 'Omis' in a.tipo %}badge-red{% elif 'Duplic' in a.tipo %}badge-yellow{% elif 'Tard' in a.tipo %}badge-yellow{% else %}badge-red{% endif %}">
+              {{ a.tipo }}
+            </span>
+          </td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ a.timestamp }}</td>
+          <td>
+            <span class="badge {% if a.prioridad == 'Alta' %}badge-red{% elif a.prioridad == 'Media' %}badge-yellow{% else %}badge-green{% endif %}">
+              {{ a.prioridad }}
+            </span>
+          </td>
+          <td>
+            <span class="badge {% if es_pend %}badge-yellow{% else %}badge-green{% endif %}">
+              {{ a.estado }}
+            </span>
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            {% if es_pend %}
+            <button class="btn btn-ghost btn-sm" title="Marcar como atendida"
+              onclick="openAtender({{ a.id }}, '{{ a.paciente }}', '{{ a.medicamento }}')">
+              <i data-lucide="check" style="width:14px;height:14px;color:#1ABC9C;"></i> Atender
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:#9CA3AF;font-size:13px;padding:20px;">
+          No hay alertas para mostrar.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal marcar alerta atendida -->
+<div id="modal-atender" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-atender')">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <span class="modal-title">Marcar alerta como atendida</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-atender')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form id="form-atender" method="POST" action="">
+      <div class="modal-body">
+        <p id="atender-info" style="font-size:14px;color:#5D6D7E;margin-bottom:14px;"></p>
+        <div class="form-group">
+          <label class="form-label">Observaciones (opcional)</label>
+          <textarea class="form-control" name="observaciones" rows="3"
+            placeholder="Ej: Se contactó al cuidador, se corrigió la omisión..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-atender')">Cancelar</button>
+        <button type="submit" class="btn btn-accent">
+          <i data-lucide="check-circle" style="width:14px;height:14px;"></i> Confirmar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>
+lucide.createIcons();
+function openAtender(id, pac, med) {
+  document.getElementById('atender-info').textContent =
+    'Alerta de ' + pac + ' — ' + med;
+  document.getElementById('form-atender').action =
+    '/doctor/alertas/' + id + '/atender';
+  openModal('modal-atender');
+  lucide.createIcons();
+}
+</script>{% endblock %}

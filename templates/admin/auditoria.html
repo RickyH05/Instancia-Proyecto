@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Auditoria{% endblock %}
+{% block page_title %}Auditoria{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Auditoria</h1><p>Registro de operaciones del sistema</p></div>
+  <button class="btn btn-primary" onclick="alert('Exportar CSV — conectar con BD')">
+    <i data-lucide="download" style="width:16px;height:16px;"></i> Exportar CSV
+  </button>
+</div>
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <input type="date" class="form-control" style="max-width:160px;" value="2026-01-01"/>
+  <input type="date" class="form-control" style="max-width:160px;" value="2026-03-31"/>
+  <div class="filter-pills" style="margin:0;">
+    <span class="pill active">Todas</span>
+    <span class="pill">INSERT</span><span class="pill">UPDATE</span><span class="pill">DELETE</span>
+  </div>
+</div>
+<div class="card">
+  <div class="table-wrap"><table>
+    <thead><tr><th>#</th><th>Tabla afectada</th><th>Registro</th><th>Operacion</th><th>Usuario</th><th>Fecha/Hora</th></tr></thead>
+    <tbody>
+      {% for r in [
+        {"id":1, "tabla":"EVENTO_NFC",     "rec":1001,"op":"INSERT","usr":"sys_nfc",     "ts":"2026-03-24 08:03"},
+        {"id":2, "tabla":"ALERTA",         "rec":1,   "op":"INSERT","usr":"sys_trigger", "ts":"2026-03-24 08:15"},
+        {"id":3, "tabla":"RECETA",         "rec":1,   "op":"UPDATE","usr":"admin_01",    "ts":"2026-03-24 09:00"},
+        {"id":4, "tabla":"ETIQUETA_NFC",   "rec":1,   "op":"UPDATE","usr":"admin_01",    "ts":"2026-03-23 15:30"},
+        {"id":5, "tabla":"PACIENTE",       "rec":4,   "op":"INSERT","usr":"admin_01",    "ts":"2026-03-22 11:00"},
+        {"id":6, "tabla":"MEDICAMENTO",    "rec":7,   "op":"UPDATE","usr":"admin_01",    "ts":"2026-03-20 14:30"},
+        {"id":7, "tabla":"MEDICO",         "rec":3,   "op":"INSERT","usr":"admin_02",    "ts":"2026-03-19 09:00"},
+        {"id":8, "tabla":"BEACON",         "rec":2,   "op":"INSERT","usr":"admin_01",    "ts":"2026-03-18 10:00"}
+      ] %}
+      <tr data-searchable>
+        <td style="color:#9CA3AF;font-size:12px;">{{ r.id }}</td>
+        <td style="font-family:monospace;font-size:13px;font-weight:500;">{{ r.tabla }}</td>
+        <td style="font-size:13px;color:#5D6D7E;">#{{ r.rec }}</td>
+        <td>
+          <span class="badge {% if r.op=='INSERT' %}badge-green{% elif r.op=='UPDATE' %}badge-yellow{% else %}badge-red{% endif %}">
+            {{ r.op }}
+          </span>
+        </td>
+        <td style="font-size:13px;color:#5D6D7E;">{{ r.usr }}</td>
+        <td style="font-size:13px;color:#5D6D7E;">{{ r.ts }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es" style="color-scheme: light;">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="color-scheme" content="light"/>
+  <title>Iniciar sesion — MediNFC</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    html, body {
+      background: #F4F6F8 !important;
+      color: #2C3E50 !important;
+      display: flex;
+      min-height: 100vh;
+    }
+    .login-left {
+      width: 460px; min-height: 100vh;
+      background: #ffffff !important;
+      display: flex; flex-direction: column;
+      padding: 40px;
+      box-shadow: 4px 0 24px rgba(0,0,0,.06);
+      position: relative; z-index: 1;
+      color: #2C3E50;
+    }
+    .login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 48px; }
+    .login-logo .logo-icon {
+      width: 44px; height: 44px; background: #1B4F72; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; color: white;
+    }
+    .login-logo .logo-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px; font-weight: 700; color: #1B4F72;
+    }
+    .login-logo .logo-name span { color: #1ABC9C; }
+    .login-heading {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 26px; font-weight: 700;
+      margin-bottom: 6px; color: #2C3E50;
+    }
+    .login-sub { font-size: 14px; color: #5D6D7E; margin-bottom: 32px; }
+    .btn-login {
+      width: 100%; height: 48px;
+      background: #1B4F72 !important; color: white !important;
+      border: none; border-radius: 8px;
+      font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: background .18s; margin-top: 4px;
+      font-family: inherit;
+    }
+    .btn-login:hover { background: #154060 !important; }
+    .demo-box {
+      margin-top: 28px;
+      background: #F8FAFC !important;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,.08);
+      padding: 14px;
+      color: #2C3E50;
+    }
+    .demo-box .demo-title {
+      font-size: 12px; font-weight: 700; color: #5D6D7E;
+      text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px;
+    }
+    .demo-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 8px;
+      cursor: pointer; transition: background .15s; min-height: 44px;
+    }
+    .demo-item:hover { background: rgba(27,79,114,.06); }
+    .demo-pill {
+      font-size: 10px; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
+    }
+    .pill-admin    { background: rgba(142,68,173,.12); color: #8E44AD; }
+    .pill-medico   { background: rgba(27,79,114,.10);  color: #1B4F72; }
+    .pill-cuidador { background: rgba(26,188,156,.12); color: #1ABC9C; }
+    .demo-creds .d-email { font-size: 13px; font-weight: 500; color: #2C3E50; }
+    .demo-creds .d-pass  { font-size: 11px; color: #5D6D7E; }
+    .login-right {
+      flex: 1;
+      background: #1B4F72;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px; position: relative; overflow: hidden;
+    }
+    .login-right::before {
+      content: ''; position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at 30% 50%, rgba(26,188,156,.18) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 80%, rgba(255,255,255,.05) 0%, transparent 50%);
+    }
+    .nfc-anim {
+      position: relative; width: 160px; height: 160px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 32px;
+    }
+    .nfc-ring {
+      position: absolute; border-radius: 50%;
+      border: 2px solid rgba(26,188,156,.4);
+      animation: pulse-ring 2.4s ease-out infinite;
+    }
+    .nfc-ring:nth-child(1) { width: 60px;  height: 60px;  animation-delay: 0s;   }
+    .nfc-ring:nth-child(2) { width: 100px; height: 100px; animation-delay: .6s;  }
+    .nfc-ring:nth-child(3) { width: 140px; height: 140px; animation-delay: 1.2s; }
+    @keyframes pulse-ring {
+      0%   { transform: scale(.8); opacity: 0; }
+      40%  { opacity: 1; }
+      100% { transform: scale(1.1); opacity: 0; }
+    }
+    .nfc-center {
+      width: 56px; height: 56px; background: #1ABC9C; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: white; position: relative; z-index: 1;
+      box-shadow: 0 4px 20px rgba(26,188,156,.4);
+    }
+    .login-right h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px; font-weight: 700;
+      color: white; text-align: center; margin-bottom: 10px; position: relative;
+    }
+    .login-right p {
+      font-size: 14px; color: rgba(255,255,255,.65);
+      text-align: center; position: relative; max-width: 300px;
+    }
+    .stats-pills { display: flex; gap: 12px; margin-top: 32px; position: relative; }
+    .stat-pill {
+      background: rgba(255,255,255,.10) !important;
+      border-radius: 8px; padding: 10px 16px; text-align: center;
+    }
+    .stat-pill .n {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px; font-weight: 700; color: #1ABC9C;
+    }
+    .stat-pill .l { font-size: 11px; color: rgba(255,255,255,.65); }
+    @media(max-width: 768px) {
+      .login-right { display: none; }
+      .login-left  { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-left">
+  <div class="login-logo">
+    <div class="logo-icon">
+      <i data-lucide="radio" style="width:22px;height:22px;"></i>
+    </div>
+    <span class="logo-name">Medi<span>NFC</span></span>
+  </div>
+
+  <h1 class="login-heading">Bienvenido de vuelta</h1>
+  <p class="login-sub">Ingresa tus credenciales para acceder a la plataforma.</p>
+
+  {% if error %}
+  <div class="flash flash-danger">
+    <i data-lucide="alert-circle" style="width:16px;height:16px;"></i> {{ error }}
+  </div>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('login') }}">
+    <div class="form-group">
+      <label class="form-label" for="email">Correo electronico</label>
+      <div class="input-icon-wrap">
+        <i data-lucide="mail" class="icon" style="width:16px;height:16px;"></i>
+        <input type="text" id="email" name="email" class="form-control"
+               placeholder="usuario [at] medinfc.com"
+               autocomplete="username"
+               value="{{ request.form.get('email','') }}"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="password">Contrasena</label>
+      <div class="input-icon-wrap">
+        <i data-lucide="lock" class="icon" style="width:16px;height:16px;"></i>
+        <input type="password" id="password" name="password" class="form-control"
+               placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+               autocomplete="current-password"
+               required/>
+      </div>
+    </div>
+    <button type="submit" class="btn-login">Iniciar sesion</button>
+  </form>
+
+  <!-- Demo box — los emails se inyectan por JS para evitar Cloudflare email-protection -->
+  <div class="demo-box">
+    <div class="demo-title">Cuentas de demostracion</div>
+
+    <div class="demo-item" id="btn-admin">
+      <span class="demo-pill pill-admin">Admin</span>
+      <div class="demo-creds">
+        <div class="d-email" id="lbl-admin"></div>
+        <div class="d-pass">demo123</div>
+      </div>
+    </div>
+
+    <div class="demo-item" id="btn-medico">
+      <span class="demo-pill pill-medico">Medico</span>
+      <div class="demo-creds">
+        <div class="d-email" id="lbl-medico"></div>
+        <div class="d-pass">demo123</div>
+      </div>
+    </div>
+
+    <div class="demo-item" id="btn-cuidador">
+      <span class="demo-pill pill-cuidador">Cuidador</span>
+      <div class="demo-creds">
+        <div class="d-email" id="lbl-cuidador"></div>
+        <div class="d-pass">demo123</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="login-right">
+  <div class="nfc-anim">
+    <div class="nfc-ring"></div>
+    <div class="nfc-ring"></div>
+    <div class="nfc-ring"></div>
+    <div class="nfc-center">
+      <i data-lucide="radio" style="width:26px;height:26px;"></i>
+    </div>
+  </div>
+  <h2>Adherencia terapeutica inteligente</h2>
+  <p>Control de medicacion con NFC, GPS e IoT para adultos mayores.</p>
+  <div class="stats-pills">
+    <div class="stat-pill"><div class="n">25</div><div class="l">Tablas BD</div></div>
+    <div class="stat-pill"><div class="n">3FN</div><div class="l">Normalizado</div></div>
+    <div class="stat-pill"><div class="n">IoT</div><div class="l">GPS+Beacon</div></div>
+  </div>
+</div>
+
+<script>
+  lucide.createIcons();
+
+  // ── Construir emails en JS para evitar que Cloudflare los ofusque en el HTML ──
+  // Separamos usuario, dominio y TLD para que CF no los detecte como email
+  var cuentas = [
+    { id:'admin',    u:'admin',    d:'medinfc', t:'com', pw:'demo123' },
+    { id:'medico',   u:'a.garcia', d:'medinfc', t:'com', pw:'demo123' },
+    { id:'cuidador', u:'m.gomez',  d:'medinfc', t:'com', pw:'demo123' }
+  ];
+
+  cuentas.forEach(function(c) {
+    var mail = c.u + String.fromCharCode(64) + c.d + '.' + c.t;
+    // Mostrar email en el label
+    var lbl = document.getElementById('lbl-' + c.id);
+    if (lbl) lbl.textContent = mail;
+    // Click -> rellenar formulario
+    var btn = document.getElementById('btn-' + c.id);
+    if (btn) {
+      btn.addEventListener('click', function() {
+        document.getElementById('email').value = mail;
+        document.getElementById('password').value = c.pw;
+        document.getElementById('email').focus();
+      });
+    }
+  });
+</script>
+</body>
+</html>

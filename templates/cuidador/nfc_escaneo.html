@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Escaneo NFC{% endblock %}
+{% block page_title %}Escaneo NFC{% endblock %}
+{% block content %}
+<a href="{{ url_for('cuidador_paciente', id=id) }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver
+</a>
+
+{% if resultado %}
+  {# ── Resultado de la toma registrada ──────────────────────────────── #}
+  {% if resultado.estado == 'Exitoso' %}
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:40px 24px;">
+      <div style="width:88px;height:88px;border-radius:50%;background:rgba(26,188,156,.12);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <i data-lucide="check-circle-2" style="width:52px;height:52px;color:#1ABC9C;"></i>
+      </div>
+      <h2 style="font-size:20px;font-weight:700;margin-bottom:12px;">Dosis registrada correctamente</h2>
+      <div class="card" style="max-width:320px;margin:0 auto 24px;text-align:left;box-shadow:none;border:1px solid #E8ECF0;">
+        <div class="card-body" style="padding:14px;">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Proximidad</span>
+            <span style="font-weight:500;color:#1ABC9C;">{{ '✅ Válida' if resultado.proximidad else '⚠️ Fuera de rango' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;">
+            <span style="color:#5D6D7E;">Evento #</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.id_evento }}</span>
+          </div>
+        </div>
+      </div>
+      <a href="{{ url_for('cuidador_paciente', id=id) }}" class="btn btn-accent" style="min-width:180px;">Listo</a>
+    </div>
+  </div>
+
+  {% elif resultado.estado == 'Tardío' %}
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:40px 24px;">
+      <div style="width:88px;height:88px;border-radius:50%;background:rgba(243,156,18,.10);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <i data-lucide="alert-triangle" style="width:52px;height:52px;color:#F39C12;"></i>
+      </div>
+      <h2 style="font-size:20px;font-weight:700;margin-bottom:8px;">Dosis fuera de horario</h2>
+      <p style="font-size:14px;color:#5D6D7E;margin-bottom:20px;">La toma fue registrada fuera de la ventana de tolerancia.</p>
+      <a href="{{ url_for('cuidador_paciente', id=id) }}" class="btn btn-ghost" style="min-width:180px;">Volver al paciente</a>
+    </div>
+  </div>
+
+  {% elif resultado.estado == 'Duplicado' %}
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:40px 24px;">
+      <div style="width:88px;height:88px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <i data-lucide="x-octagon" style="width:52px;height:52px;color:#E74C3C;"></i>
+      </div>
+      <h2 style="font-size:20px;font-weight:700;color:#E74C3C;margin-bottom:8px;">Dosis duplicada detectada</h2>
+      <p style="font-size:14px;color:#5D6D7E;margin-bottom:16px;">Este medicamento ya fue registrado previamente en este horario.</p>
+      <div style="background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.2);border-radius:8px;padding:14px;max-width:320px;margin:0 auto 24px;font-size:13px;color:#c0392b;">
+        ⚠️ Tomar una dosis duplicada puede ser peligroso. Contacta al médico si tienes dudas.
+      </div>
+      <a href="{{ url_for('cuidador_paciente', id=id) }}" class="btn btn-ghost" style="border-color:#E74C3C;color:#E74C3C;min-width:180px;">Cancelar</a>
+    </div>
+  </div>
+  {% endif %}
+
+{% else %}
+  {# ── Formulario de escaneo ─────────────────────────────────────────── #}
+  <div class="card">
+    <div class="card-header"><h3>Registrar toma NFC</h3></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('cuidador_escaneo', id=id) }}">
+        <div class="form-group">
+          <label class="form-label">UID de la etiqueta NFC <span style="color:#E74C3C;">*</span></label>
+          <input type="text" name="uid_nfc" class="form-control"
+            placeholder="Ej: A1:B2:C3:D4" required
+            style="font-family:monospace;">
+          <span style="font-size:12px;color:#9CA3AF;">Escanea la etiqueta o ingresa el UID manualmente.</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Latitud <span style="color:#E74C3C;">*</span></label>
+            <input type="number" name="lat" id="inp-lat" class="form-control"
+              step="any" placeholder="25.6866" required>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Longitud <span style="color:#E74C3C;">*</span></label>
+            <input type="number" name="lon" id="inp-lon" class="form-control"
+              step="any" placeholder="-100.3161" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Observaciones (opcional)</label>
+          <textarea name="observaciones" class="form-control" rows="2"
+            placeholder="Notas sobre la toma..."></textarea>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="obtenerUbicacion()" style="margin-bottom:16px;">
+          <i data-lucide="map-pin" style="width:14px;height:14px;"></i> Usar mi ubicación actual
+        </button>
+        <div style="display:flex;gap:10px;">
+          <a href="{{ url_for('cuidador_paciente', id=id) }}" class="btn btn-ghost">Cancelar</a>
+          <button type="submit" class="btn btn-accent" style="flex:1;">
+            <i data-lucide="radio" style="width:16px;height:16px;"></i> Registrar toma
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Alerta etiqueta inactiva (flash desde el backend) -->
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in msgs %}
+  <div style="margin-top:16px;background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.2);
+    border-radius:8px;padding:14px;font-size:13px;color:#c0392b;">
+    {{ msg }}
+  </div>
+  {% endfor %}
+  {% endwith %}
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+lucide.createIcons();
+function obtenerUbicacion() {
+  if (!navigator.geolocation) { alert('Geolocalización no soportada en este dispositivo.'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById('inp-lat').value = pos.coords.latitude.toFixed(7);
+      document.getElementById('inp-lon').value = pos.coords.longitude.toFixed(7);
+    },
+    () => alert('No se pudo obtener la ubicación. Ingrésala manualmente.')
+  );
+}
+</script>
+{% endblock %}

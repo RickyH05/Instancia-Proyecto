@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Detalle Beacon{% endblock %}
+{% block page_title %}Detalle Beacon{% endblock %}
+{% block content %}
+<a href="javascript:history.back()" class="btn btn-ghost btn-sm" style="margin-bottom:16px;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver
+</a>
+
+<!-- Header -->
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+  <div class="patient-avatar" style="width:44px;height:44px;font-size:14px;">JL</div>
+  <div>
+    <div style="font-weight:700;font-size:17px;">Juan López Martínez</div>
+    <div style="font-size:13px;color:#5D6D7E;">Detalle de presencia y beacons</div>
+  </div>
+</div>
+
+<!-- Plano del domicilio SVG -->
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header"><h3>Plano del Domicilio</h3></div>
+  <div class="card-body">
+    <svg viewBox="0 0 320 260" style="width:100%;background:#F9FAFB;border-radius:8px;">
+      <!-- Sala -->
+      <rect x="10" y="10" width="140" height="120" rx="4" fill="white" stroke="#D1D5DB" stroke-width="1.5"/>
+      <text x="80" y="26" text-anchor="middle" fill="#5D6D7E" font-size="10" font-weight="500">Sala</text>
+      <!-- Beacon sala (cobertura) -->
+      <circle cx="80" cy="70" r="36" fill="#1B4F72" fill-opacity="0.06" stroke="#1B4F72" stroke-width="1" stroke-dasharray="4 2"/>
+      <circle cx="80" cy="70" r="6"  fill="#1B4F72" stroke="white" stroke-width="2"/>
+      <text x="80" y="118" text-anchor="middle" fill="#1B4F72" font-size="8" font-weight="600">Beacon Sala</text>
+      <!-- Recámara -->
+      <rect x="170" y="10" width="140" height="120" rx="4" fill="white" stroke="#D1D5DB" stroke-width="1.5"/>
+      <text x="240" y="26" text-anchor="middle" fill="#5D6D7E" font-size="10" font-weight="500">Recámara</text>
+      <!-- Beacon recámara -->
+      <circle cx="240" cy="70" r="24" fill="#1B4F72" fill-opacity="0.06" stroke="#1B4F72" stroke-width="1" stroke-dasharray="4 2"/>
+      <circle cx="240" cy="70" r="6"  fill="#1B4F72" stroke="white" stroke-width="2"/>
+      <text x="240" y="118" text-anchor="middle" fill="#1B4F72" font-size="8" font-weight="600">Beacon Recámara</text>
+      <!-- Cocina -->
+      <rect x="10" y="150" width="100" height="80" rx="4" fill="white" stroke="#D1D5DB" stroke-width="1.5"/>
+      <text x="60" y="196" text-anchor="middle" fill="#5D6D7E" font-size="10" font-weight="500">Cocina</text>
+      <!-- Baño -->
+      <rect x="130" y="150" width="80" height="80" rx="4" fill="white" stroke="#D1D5DB" stroke-width="1.5"/>
+      <text x="170" y="196" text-anchor="middle" fill="#5D6D7E" font-size="10" font-weight="500">Baño</text>
+      <!-- Comedor -->
+      <rect x="230" y="150" width="80" height="80" rx="4" fill="white" stroke="#D1D5DB" stroke-width="1.5"/>
+      <text x="270" y="196" text-anchor="middle" fill="#5D6D7E" font-size="10" font-weight="500">Comedor</text>
+    </svg>
+    <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:#5D6D7E;">
+      <div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;border-radius:50%;background:#1B4F72;"></div> Beacon instalado</div>
+      <div style="display:flex;align-items:center;gap:4px;"><div style="width:20px;height:10px;border-radius:3px;border:1px dashed #1B4F72;"></div> Radio cobertura</div>
+    </div>
+  </div>
+</div>
+
+<!-- Resumen mensual -->
+<div class="stats-grid stats-grid-3" style="margin-bottom:16px;">
+  <div class="stat-card" style="padding:14px;"><div><div class="stat-label">Total tomas</div><div class="stat-value" style="color:#1B4F72;font-size:26px;">8</div></div></div>
+  <div class="stat-card" style="padding:14px;"><div><div class="stat-label">Con presencia</div><div class="stat-value" style="color:#1ABC9C;font-size:26px;">5</div></div></div>
+  <div class="stat-card" style="padding:14px;"><div><div class="stat-label">Sin presencia</div><div class="stat-value" style="color:#E74C3C;font-size:26px;">3</div></div></div>
+</div>
+
+<!-- Historial -->
+<div class="card">
+  <div class="card-header"><h3>Historial de Tomas</h3></div>
+  <div class="card-body">
+    <div class="timeline">
+      {% for ev in [
+        {"ts":"08:05","med":"Metformina 500mg",   "valid":true, "beacon":"Beacon Sala","dist":"2.3"},
+        {"ts":"08:06","med":"Losartán 50mg",       "valid":true, "beacon":"Beacon Sala","dist":"2.5"},
+        {"ts":"08:30","med":"Furosemida 40mg",     "valid":false,"beacon":"Beacon Cocina","dist":"12.8"},
+        {"ts":"21:00","med":"Atorvastatina 20mg",  "valid":false,"beacon":None,"dist":None}
+      ] %}
+      <div class="timeline-item">
+        <div class="timeline-spine">
+          <div style="font-size:11px;color:#5D6D7E;font-weight:600;white-space:nowrap;min-width:38px;">{{ ev.ts }}</div>
+          <div class="timeline-dot {% if ev.valid %}green{% else %}red{% endif %}" style="margin:6px 0 0;"></div>
+          <div class="timeline-line"></div>
+        </div>
+        <div class="timeline-content" style="padding-left:4px;">
+          <div class="timeline-card" style="border-left:3px solid {% if ev.valid %}#1ABC9C{% else %}#E74C3C{% endif %};">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div style="font-weight:600;font-size:13px;">{{ ev.med }}</div>
+              {% if ev.valid %}
+              <i data-lucide="check-circle-2" style="width:16px;height:16px;color:#1ABC9C;"></i>
+              {% else %}
+              <i data-lucide="x-circle" style="width:16px;height:16px;color:#E74C3C;"></i>
+              {% endif %}
+            </div>
+            <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+              {% if ev.beacon %}
+              <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(27,79,114,.08);color:#1B4F72;font-weight:500;">
+                📡 {{ ev.beacon }}
+              </span>
+              {% else %}
+              <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(243,156,18,.10);color:#F39C12;font-weight:500;">Sin beacon</span>
+              {% endif %}
+              {% if ev.dist %}
+              <span style="font-size:10px;color:#5D6D7E;">{{ ev.dist }}m</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

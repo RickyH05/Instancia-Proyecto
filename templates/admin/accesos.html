@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Log de Accesos{% endblock %}
+{% block page_title %}Log de Accesos{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Log de accesos</h1><p>Intentos de inicio de sesion registrados en el sistema</p></div>
+</div>
+
+<form method="GET" action="{{ url_for('admin_accesos') }}"
+      style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
+  <div class="form-group" style="margin:0;">
+    <label class="form-label">Filtrar por ID usuario</label>
+    <input type="number" name="id_usr" class="form-control" style="max-width:160px;"
+           placeholder="Todos" value="{{ id_usr or '' }}"/>
+  </div>
+  <div class="form-group" style="margin:0;">
+    <label class="form-label">Max registros</label>
+    <select name="limite" class="form-control" style="width:110px;">
+      {% for l in [50, 100, 200, 500] %}
+      <option value="{{ l }}" {% if l == limite %}selected{% endif %}>{{ l }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="btn btn-primary" style="margin-bottom:0;">
+    <i data-lucide="filter" style="width:14px;height:14px;"></i> Filtrar
+  </button>
+  {% if id_usr %}
+  <a href="{{ url_for('admin_accesos') }}" class="btn btn-ghost" style="margin-bottom:0;">Ver todos</a>
+  {% endif %}
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Email</th><th>Rol</th><th>IP</th>
+        <th style="text-align:center;">Resultado</th><th>Fecha / Hora</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td style="color:#9CA3AF;font-size:12px;">{{ r[0] }}</td>
+          <td style="font-weight:500;font-size:13px;">{{ r[2] }}</td>
+          <td>
+            {% if r[3] == 'medico' %}
+              <span class="badge badge-blue">Medico</span>
+            {% elif r[3] == 'cuidador' %}
+              <span class="badge badge-green">Cuidador</span>
+            {% elif r[3] == 'admin' %}
+              <span class="badge" style="background:rgba(142,68,173,.12);color:#8E44AD;">Admin</span>
+            {% else %}
+              <span class="badge badge-gray">{{ r[3] or '—' }}</span>
+            {% endif %}
+          </td>
+          <td style="font-family:monospace;font-size:12px;color:#5D6D7E;">{{ r[4] or '—' }}</td>
+          <td style="text-align:center;">
+            {% if r[5] %}
+              <span class="badge badge-green">Exitoso</span>
+            {% else %}
+              <span class="badge badge-red">Fallido</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;color:#5D6D7E;white-space:nowrap;">{{ r[6] }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:32px;">No hay registros de acceso.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

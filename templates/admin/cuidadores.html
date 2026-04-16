@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Cuidadores{% endblock %}
+{% block page_title %}Cuidadores{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Cuidadores</h1><p>Gestion de cuidadores registrados</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-cuid');setModoNuevo()">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nuevo
+  </button>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por nombre o correo..."/>
+  </div>
+  <div class="filter-pills" style="margin:0;">
+    <span class="pill active">Todos</span>
+    <span class="pill">Formales</span>
+    <span class="pill">Informales</span>
+    <span class="pill">Activos</span>
+    <span class="pill">Inactivos</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Nombre</th><th>Tipo</th><th>Telefono</th><th>Correo</th>
+        <th>Pacientes</th><th>Estado</th><th style="text-align:right;">Acciones</th>
+      </tr></thead>
+      <tbody>
+        {% for c in [
+          {"id":1,"nombre":"Maria","apP":"Gomez","apM":"Flores",
+           "tipo":"Formal","tel":"+52 55 1234 5678","email":"m.gomez [at] medinfc.com","pac":2,"activo":true},
+          {"id":2,"nombre":"Roberto","apP":"Hernandez","apM":"Diaz",
+           "tipo":"Informal","tel":"+52 55 9876 5432","email":"r.hernandez [at] mail.com","pac":1,"activo":true},
+          {"id":3,"nombre":"Lucia","apP":"Fernandez","apM":"Rios",
+           "tipo":"Formal","tel":"+52 55 5555 1234","email":"l.fernandez [at] medinfc.com","pac":1,"activo":true},
+          {"id":4,"nombre":"Pedro","apP":"Salazar","apM":"Mora",
+           "tipo":"Informal","tel":"+52 55 6666 7777","email":"p.salazar [at] mail.com","pac":0,"activo":false}
+        ] %}
+        <tr data-searchable>
+          <td style="font-weight:500;">{{ c.nombre }} {{ c.apP }} {{ c.apM }}</td>
+          <td>
+            <span class="badge {% if c.tipo=='Formal' %}badge-blue{% else %}badge-gray{% endif %}">{{ c.tipo }}</span>
+          </td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ c.tel }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ c.email }}</td>
+          <td style="text-align:center;font-size:13px;">{{ c.pac }}</td>
+          <td>
+            {% if c.activo %}<span class="badge badge-green">Activo</span>
+            {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
+              onclick="editCuid({{ c.id }},'{{ c.nombre }}','{{ c.apP }}','{{ c.apM }}','{{ c.tipo }}','{{ c.tel }}',{{ 'true' if c.activo else 'false' }})">
+              <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </button>
+            <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
+              onclick="openConfirm('Eliminar a {{ c.nombre }} {{ c.apP }}?','Se eliminara el cuidador y todas sus asignaciones del sistema.')">
+              <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nuevo / editar -->
+<div id="modal-cuid" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-cuid')">
+  <div class="modal-box" style="max-width:540px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-cuid-title">Nuevo Cuidador</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-cuid')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Nombre *</label>
+          <input class="form-control" id="c-nombre"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ap. Paterno *</label>
+          <input class="form-control" id="c-apP"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ap. Materno</label>
+          <input class="form-control" id="c-apM"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Tipo</label>
+          <select class="form-control" id="c-tipo">
+            <option value="Formal">Formal</option>
+            <option value="Informal">Informal</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefono</label>
+          <input class="form-control" id="c-tel" placeholder="+52 55 0000 0000"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Correo electronico *</label>
+        <input class="form-control" id="c-email" type="text" placeholder="correo [at] dominio.com"/>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:12px;">
+        <label class="form-label" style="margin:0;">Activo</label>
+        <input type="checkbox" id="c-activo" checked style="width:18px;height:18px;accent-color:#1B4F72;cursor:pointer;"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-cuid')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-cuid')">
+        <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmar eliminar -->
+<div id="modal-confirm" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-confirm')">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#E74C3C;">Confirmar eliminacion</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-confirm')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+        </div>
+        <div>
+          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
+          <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
+        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>
+lucide.createIcons();
+function setModoNuevo(){
+  document.getElementById('modal-cuid-title').textContent='Nuevo Cuidador';
+  ['c-nombre','c-apP','c-apM','c-tel','c-email'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('c-tipo').value='Formal';
+  document.getElementById('c-activo').checked=true;
+}
+function editCuid(id,nombre,apP,apM,tipo,tel,activo){
+  document.getElementById('modal-cuid-title').textContent='Editar Cuidador';
+  document.getElementById('c-nombre').value=nombre;
+  document.getElementById('c-apP').value=apP;
+  document.getElementById('c-apM').value=apM;
+  document.getElementById('c-tipo').value=tipo;
+  document.getElementById('c-tel').value=tel;
+  document.getElementById('c-activo').checked=activo;
+  openModal('modal-cuid'); lucide.createIcons();
+}
+function openConfirm(title,msg){
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  openModal('modal-confirm'); lucide.createIcons();
+}
+</script>{% endblock %}

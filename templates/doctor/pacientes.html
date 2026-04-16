@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Pacientes{% endblock %}
+{% block page_title %}Pacientes{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div><h1>Pacientes</h1><p>{{ pacientes|length }} paciente{{ 's' if pacientes|length != 1 }} activo{{ 's' if pacientes|length != 1 }}</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-nuevo-paciente')">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nuevo Paciente
+  </button>
+</div>
+
+<!-- Busqueda y filtros -->
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:16px;height:16px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por nombre o CURP..."/>
+  </div>
+  <div class="filter-pills" style="margin:0;">
+    <span class="pill active">Todos</span>
+    <span class="pill">Activos</span>
+    <span class="pill">Baja adherencia</span>
+    <span class="pill">Con alertas</span>
+  </div>
+</div>
+
+<!-- Lista de pacientes -->
+<div style="display:flex;flex-direction:column;gap:12px;">
+  {% for p in pacientes %}
+  {% set rx_vig = p.recetas | selectattr('estado', 'equalto', 'vigente') | list %}
+  <div data-searchable style="background:#ffffff;border-radius:12px;padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.06);display:flex;align-items:flex-start;gap:14px;">
+    <div class="patient-avatar" style="flex-shrink:0;">{{ p.nombre[:2].upper() }}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div>
+          <a href="{{ url_for('doctor_paciente_perfil', id=p.id) }}"
+            style="font-weight:700;font-size:15px;color:#2C3E50;text-decoration:none;">
+            {{ p.nombre }}
+          </a>
+          <div style="font-size:12px;color:#9CA3AF;font-family:monospace;margin-top:1px;">{{ p.curp }}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <a href="{{ url_for('doctor_paciente_perfil', id=p.id) }}"
+            class="btn btn-ghost btn-sm" title="Ver perfil">
+            <i data-lucide="eye" style="width:14px;height:14px;"></i> Ver
+          </a>
+        </div>
+      </div>
+      <div style="font-size:13px;color:#5D6D7E;margin-top:6px;">
+        {{ rx_vig|length }} receta{{ 's' if rx_vig|length != 1 }} vigente{{ 's' if rx_vig|length != 1 }}
+        {% if not p.activo %}<span class="badge badge-red" style="margin-left:8px;">Inactivo</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <p style="font-size:14px;color:#9CA3AF;margin-top:12px;">No hay pacientes asignados.</p>
+  {% endfor %}
+</div>
+
+<!-- ════ MODAL NUEVO PACIENTE ════ -->
+<div id="modal-nuevo-paciente" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-nuevo-paciente')">
+  <div class="modal-box" style="max-width:580px;">
+    <div class="modal-header">
+      <span class="modal-title">Nuevo Paciente</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-nuevo-paciente')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Nombre *</label>
+          <input class="form-control" placeholder="Juan"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ap. Paterno *</label>
+          <input class="form-control" placeholder="Lopez"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ap. Materno</label>
+          <input class="form-control" placeholder="Martinez"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">CURP *</label>
+          <input class="form-control" style="font-family:monospace;" placeholder="XXXX000000XXXXXXXX"
+            maxlength="18" oninput="this.value=this.value.toUpperCase()"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de nacimiento</label>
+          <input class="form-control" type="date"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Diagnosticos</label>
+        <input class="form-control" placeholder="Diabetes Tipo 2, HTA... (separados por coma)"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cuidador principal</label>
+        <select class="form-control">
+          <option value="">— Seleccionar —</option>
+          <option>Maria Gomez Flores</option>
+          <option>Roberto Hernandez Diaz</option>
+          <option>Lucia Fernandez Rios</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-nuevo-paciente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-nuevo-paciente')">
+        <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar Paciente
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODAL EDITAR PACIENTE ════ -->
+<div id="modal-editar-paciente" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-editar-paciente')">
+  <div class="modal-box" style="max-width:580px;">
+    <div class="modal-header">
+      <span class="modal-title">Editar Paciente</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-editar-paciente')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Nombre *</label>
+          <input class="form-control" id="edit-nombre"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ap. Paterno *</label>
+          <input class="form-control" id="edit-apP"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ap. Materno</label>
+          <input class="form-control" id="edit-apM"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">CURP</label>
+          <input class="form-control" id="edit-curp" style="font-family:monospace;"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select class="form-control">
+            <option>Activo</option>
+            <option>Inactivo</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Diagnosticos</label>
+        <input class="form-control" placeholder="Diabetes Tipo 2, HTA..."/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-editar-paciente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-editar-paciente')">
+        <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar Cambios
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODAL CONFIRMAR ELIMINAR ════ -->
+<div id="modal-confirm" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-confirm')">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#E74C3C;">Confirmar eliminacion</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-confirm')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+        </div>
+        <div>
+          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
+          <div id="confirm-msg" style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
+        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+lucide.createIcons();
+
+// Datos demo para pre-rellenar el modal de edicion
+var pacientes = {
+  '1': { nombre:'Juan', apP:'Lopez', apM:'Martinez', curp:'LOMJ680215HDFRTN09' },
+  '2': { nombre:'Ana',  apP:'Torres',apM:'Ramirez',  curp:'TORA720510MDFMRN08' },
+  '3': { nombre:'Carlos',apP:'Ruiz', apM:'Sanchez',  curp:'RUSC550823HDFZLN05' },
+  '4': { nombre:'Elena', apP:'Morales',apM:'Diaz',   curp:'MODE610312MDFRLZ01' }
+};
+
+function openEditPaciente(id, nombre) {
+  var p = pacientes[id];
+  if (p) {
+    document.getElementById('edit-nombre').value = p.nombre;
+    document.getElementById('edit-apP').value    = p.apP;
+    document.getElementById('edit-apM').value    = p.apM;
+    document.getElementById('edit-curp').value   = p.curp;
+  }
+  openModal('modal-editar-paciente');
+  lucide.createIcons();
+}
+
+function openConfirm(title, msg) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent   = msg;
+  openModal('modal-confirm');
+  lucide.createIcons();
+}
+</script>
+{% endblock %}

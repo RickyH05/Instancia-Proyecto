@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="color-scheme" content="light only"/>
+  <title>{% block title %}MediNFC{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body style="background:#F4F6F8;color:#2C3E50;margin:0;padding:0;font-family:'DM Sans',system-ui,sans-serif;">
+
+<div id="sidebar-overlay" onclick="closeSidebar()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99;"></div>
+
+<!-- SIDEBAR -->
+<aside id="sidebar" style="width:260px;background:#1B4F72;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:transform .25s;">
+
+  <div style="padding:20px;border-bottom:1px solid rgba(255,255,255,.12);">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:36px;height:36px;background:rgba(255,255,255,.18);border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;">
+        <i data-lucide="radio" style="width:20px;height:20px;"></i>
+      </div>
+      <span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:white;">
+        Medi<span style="color:#1ABC9C;">NFC</span>
+      </span>
+    </div>
+    <div style="font-size:11px;color:#1ABC9C;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-top:4px;padding-left:2px;">
+      {% if session.rol=='admin' %}Admin Panel{% elif session.rol=='medico' %}Panel Medico{% else %}Panel Cuidador{% endif %}
+    </div>
+  </div>
+
+  <nav style="flex:1;padding:12px;overflow-y:auto;">
+    {% if session.rol == 'admin' %}
+      <a href="{{ url_for('admin_dashboard') }}"    class="nav-item"><i data-lucide="home"           class="nav-icon"></i>Dashboard</a>
+      <div class="nav-label">Gestion</div>
+      <a href="{{ url_for('admin_medicos') }}"        class="nav-item"><i data-lucide="stethoscope"    class="nav-icon"></i>Medicos</a>
+      <a href="{{ url_for('admin_cuidadores') }}"     class="nav-item"><i data-lucide="users"          class="nav-icon"></i>Cuidadores</a>
+      <a href="{{ url_for('admin_medicamentos') }}"   class="nav-item"><i data-lucide="pill"           class="nav-icon"></i>Medicamentos</a>
+      <a href="{{ url_for('admin_diagnosticos') }}"   class="nav-item"><i data-lucide="heart-pulse"    class="nav-icon"></i>Diagnosticos</a>
+      <a href="{{ url_for('admin_especialidades') }}" class="nav-item"><i data-lucide="graduation-cap" class="nav-icon"></i>Especialidades</a>
+      <div class="nav-label">IoT</div>
+      <a href="{{ url_for('admin_gps') }}"     class="nav-item"><i data-lucide="smartphone" class="nav-icon"></i>Dispositivos GPS</a>
+      <a href="{{ url_for('admin_beacons') }}" class="nav-item"><i data-lucide="radio"      class="nav-icon"></i>Beacons BLE</a>
+      <div class="nav-label">Sistema</div>
+      <a href="{{ url_for('admin_auditoria') }}"     class="nav-item"><i data-lucide="clipboard-list" class="nav-icon"></i>Auditoria</a>
+      <a href="{{ url_for('admin_configuracion') }}" class="nav-item"><i data-lucide="settings"       class="nav-icon"></i>Configuracion</a>
+    {% elif session.rol == 'medico' %}
+      <a href="{{ url_for('doctor_dashboard') }}"  class="nav-item"><i data-lucide="home"           class="nav-icon"></i>Dashboard</a>
+      <a href="{{ url_for('doctor_pacientes') }}"  class="nav-item"><i data-lucide="users"          class="nav-icon"></i>Pacientes</a>
+      <a href="{{ url_for('doctor_recetas') }}"    class="nav-item"><i data-lucide="clipboard-list" class="nav-icon"></i>Recetas</a>
+      <a href="{{ url_for('doctor_reportes') }}"   class="nav-item"><i data-lucide="bar-chart-3"    class="nav-icon"></i>Reportes</a>
+      <a href="{{ url_for('doctor_alertas') }}"    class="nav-item"><i data-lucide="bell"           class="nav-icon"></i>Alertas <span class="nav-badge">2</span></a>
+      <div class="nav-label">IoT</div>
+      <a href="{{ url_for('doctor_proximidad_mapa') }}"      class="nav-item"><i data-lucide="map-pin" class="nav-icon"></i>Mapa Proximidad</a>
+      <a href="{{ url_for('doctor_proximidad_historial') }}" class="nav-item"><i data-lucide="history"  class="nav-icon"></i>Historial GPS</a>
+      <div class="nav-label">Cuenta</div>
+      <a href="{{ url_for('doctor_configuracion') }}" class="nav-item"><i data-lucide="settings" class="nav-icon"></i>Configuracion</a>
+    {% else %}
+      <a href="{{ url_for('cuidador_home') }}"      class="nav-item"><i data-lucide="home"       class="nav-icon"></i>Inicio</a>
+      <a href="{{ url_for('cuidador_historial') }}" class="nav-item"><i data-lucide="clock"      class="nav-icon"></i>Historial NFC</a>
+      <a href="{{ url_for('cuidador_alertas') }}"   class="nav-item"><i data-lucide="bell"       class="nav-icon"></i>Alertas <span class="nav-badge">2</span></a>
+      <div class="nav-label">IoT</div>
+      <a href="{{ url_for('cuidador_mi_gps') }}" class="nav-item"><i data-lucide="smartphone" class="nav-icon"></i>Mi Dispositivo GPS</a>
+    {% endif %}
+  </nav>
+
+  <div style="padding:12px;border-top:1px solid rgba(255,255,255,.12);">
+    <div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:4px;">
+      <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;flex-shrink:0;">
+        {{ session.nombre[:2].upper() }}
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:white;">{{ session.nombre }}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.6);">{{ session.rol|capitalize }}</div>
+      </div>
+    </div>
+    <a href="{{ url_for('logout') }}" style="display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:8px;background:none;border:none;color:rgba(255,255,255,.6);font-size:13px;cursor:pointer;text-decoration:none;transition:all .18s;" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='none'">
+      <i data-lucide="log-out" style="width:16px;height:16px;"></i> Cerrar sesion
+    </a>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div style="margin-left:260px;display:flex;flex-direction:column;min-height:100vh;background:#F4F6F8;" id="main-wrap">
+
+  <!-- TOPBAR -->
+  <header style="background:#ffffff;height:64px;border-bottom:1px solid rgba(0,0,0,.08);display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:0 1px 3px rgba(0,0,0,.04);position:sticky;top:0;z-index:50;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button id="menu-btn" onclick="openSidebar()" style="display:none;width:40px;height:40px;border-radius:8px;background:none;border:none;cursor:pointer;align-items:center;justify-content:center;color:#5D6D7E;">
+        <i data-lucide="menu" style="width:20px;height:20px;"></i>
+      </button>
+      <h1 style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;color:#2C3E50;margin:0;">
+        {% block page_title %}{% endblock %}
+      </h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button style="width:40px;height:40px;border-radius:8px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#5D6D7E;position:relative;">
+        <i data-lucide="bell" style="width:20px;height:20px;"></i>
+        <span style="position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#E74C3C;border:2px solid white;"></span>
+      </button>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:500;color:#2C3E50;">{{ session.nombre }}</div>
+          <div style="font-size:12px;color:#5D6D7E;">{{ session.rol|capitalize }}</div>
+        </div>
+        <div style="width:36px;height:36px;border-radius:50%;background:#1B4F72;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;">
+          {{ session.nombre[:2].upper() }}
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- FLASH -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div style="padding:12px 24px 0;">
+    {% for cat, msg in messages %}
+    <div style="padding:12px 16px;border-radius:8px;font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:8px;{% if cat=='danger' %}background:rgba(231,76,60,.10);color:#c0392b;border:1px solid rgba(231,76,60,.2);{% else %}background:rgba(26,188,156,.10);color:#16a085;border:1px solid rgba(26,188,156,.2);{% endif %}">
+      {{ msg }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <!-- CONTENT -->
+  <main style="flex:1;padding:24px;background:#F4F6F8;">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+lucide.createIcons();
+
+// Marcar nav activo
+document.querySelectorAll('.nav-item').forEach(function(el){
+  if(el.getAttribute('href') === window.location.pathname) el.classList.add('active');
+});
+
+// Sidebar móvil
+function openSidebar(){
+  document.getElementById('sidebar').style.transform='translateX(0)';
+  document.getElementById('sidebar-overlay').style.display='block';
+}
+function closeSidebar(){
+  document.getElementById('sidebar').style.transform='translateX(-100%)';
+  document.getElementById('sidebar-overlay').style.display='none';
+}
+
+// Mostrar menú hamburguesa en móvil
+if(window.innerWidth < 1024){
+  document.getElementById('main-wrap').style.marginLeft='0';
+  document.getElementById('sidebar').style.transform='translateX(-100%)';
+  var mb=document.getElementById('menu-btn');
+  if(mb) mb.style.display='flex';
+}
+
+// Modal system
+function openModal(id){
+  var m=document.getElementById(id);
+  if(m){ m.style.display='flex'; document.body.style.overflow='hidden'; }
+}
+function closeModal(id){
+  var m=document.getElementById(id);
+  if(m){ m.style.display='none'; document.body.style.overflow=''; }
+}
+// Cerrar modal al click en overlay
+document.addEventListener('click', function(e){
+  if(e.target && e.target.classList && e.target.classList.contains('modal-overlay')){
+    e.target.style.display='none';
+    document.body.style.overflow='';
+  }
+});
+
+// Pills filter
+document.querySelectorAll('.filter-pills .pill').forEach(function(p){
+  p.onclick=function(){
+    p.closest('.filter-pills').querySelectorAll('.pill').forEach(function(x){ x.classList.remove('active'); });
+    p.classList.add('active');
+  };
+});
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

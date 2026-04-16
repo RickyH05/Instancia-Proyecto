@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Riesgo de Omision{% endblock %}
+{% block page_title %}Riesgo de Omision{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Riesgo de omision consecutiva</h1><p>Pacientes con rachas de omisiones activas o historicas</p></div>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+  <div class="filter-pills" style="margin:0;">
+    <a href="{{ url_for('admin_reporte_riesgo', activas='1') }}"
+       class="pill {% if solo_activas %}active{% endif %}">Solo activas</a>
+    <a href="{{ url_for('admin_reporte_riesgo', activas='0') }}"
+       class="pill {% if not solo_activas %}active{% endif %}">Todas</a>
+  </div>
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por paciente o medicamento..."/>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Paciente</th><th>Medicamento</th>
+        <th style="text-align:center;">Dias consecutivos</th>
+        <th>Nivel de riesgo</th>
+        <th>Inicio racha</th><th>Fin racha</th>
+        <th style="text-align:center;">Activa</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-searchable>
+          <td style="font-weight:500;">{{ r[1] }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ r[2] }}</td>
+          <td style="text-align:center;font-weight:700;font-size:15px;
+            color:{% if r[6]=='CRÍTICO' %}#c0392b{% elif r[6]=='ALTO' %}#d68910{% else %}#5D6D7E{% endif %};">
+            {{ r[5] }}
+          </td>
+          <td>
+            {% if r[6] == 'CRÍTICO' %}
+              <span class="badge badge-red">CRITICO</span>
+            {% elif r[6] == 'ALTO' %}
+              <span class="badge badge-yellow">ALTO</span>
+            {% else %}
+              <span class="badge badge-gray">MODERADO</span>
+            {% endif %}
+          </td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ r[3] }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ r[4] or '—' }}</td>
+          <td style="text-align:center;">
+            {% if r[7] %}
+              <span class="badge badge-red">Activa</span>
+            {% else %}
+              <span class="badge badge-gray">Cerrada</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:32px;">No se encontraron rachas de omision.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

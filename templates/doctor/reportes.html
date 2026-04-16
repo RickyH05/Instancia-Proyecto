@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Reportes{% endblock %}
+{% block page_title %}Reportes{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Reportes</h1><p>Análisis de adherencia terapéutica</p></div>
+  <button class="btn btn-primary">
+    <i data-lucide="download" style="width:15px;height:15px;"></i> Exportar PDF
+  </button>
+</div>
+
+<!-- Filtros -->
+<div class="card" style="padding:14px 16px;margin-bottom:20px;">
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    <div class="form-group" style="margin:0;flex:1;min-width:160px;">
+      <label class="form-label" style="font-size:12px;">Paciente</label>
+      <select class="form-control">
+        <option>Todos los pacientes</option>
+        <option>Juan López Martínez</option>
+        <option>Ana Torres Ramírez</option>
+        <option>Carlos Ruiz Sánchez</option>
+        <option>Elena Morales Díaz</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin:0;">
+      <label class="form-label" style="font-size:12px;">Desde</label>
+      <input type="date" class="form-control" value="2026-02-14"/>
+    </div>
+    <div class="form-group" style="margin:0;">
+      <label class="form-label" style="font-size:12px;">Hasta</label>
+      <input type="date" class="form-control" value="2026-03-24"/>
+    </div>
+  </div>
+</div>
+
+<!-- Adherencia por paciente -->
+<div class="stats-grid stats-grid-4" style="margin-bottom:24px;">
+  {% for p in [
+    {"n":"Juan López",  "adh":92,"esp":42,"tom":39,"om":3},
+    {"n":"Ana Torres",  "adh":67,"esp":28,"tom":19,"om":9},
+    {"n":"Carlos Ruiz", "adh":45,"esp":28,"tom":13,"om":15},
+    {"n":"Elena Morales","adh":88,"esp":42,"tom":37,"om":5}
+  ] %}
+  <div class="card" style="box-shadow:var(--shadow-sm);">
+    <div class="card-body" style="padding:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div class="patient-avatar" style="width:36px;height:36px;font-size:12px;">{{ p.n[:2].upper() }}</div>
+        <span style="font-weight:600;font-size:13px;">{{ p.n }}</span>
+      </div>
+      <!-- Gauge SVG -->
+      <div style="text-align:center;margin-bottom:10px;">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="30" fill="none" stroke="#E8ECF0" stroke-width="7"/>
+          <circle cx="40" cy="40" r="30" fill="none"
+            stroke="{% if p.adh >= 80 %}#1ABC9C{% elif p.adh >= 50 %}#F39C12{% else %}#E74C3C{% endif %}"
+            stroke-width="7" stroke-linecap="round"
+            stroke-dasharray="{{ (p.adh / 100 * 188.5)|round(1) }} 188.5"
+            transform="rotate(-90 40 40)"/>
+          <text x="40" y="45" text-anchor="middle" font-size="14" font-weight="700"
+            fill="{% if p.adh >= 80 %}#1ABC9C{% elif p.adh >= 50 %}#F39C12{% else %}#E74C3C{% endif %}">{{ p.adh }}%</text>
+        </svg>
+      </div>
+      <div style="font-size:12px;color:#5D6D7E;display:flex;flex-direction:column;gap:2px;">
+        <div style="display:flex;justify-content:space-between;"><span>Esperadas:</span><span style="font-weight:500;color:#2C3E50;">{{ p.esp }}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Tomadas:</span><span style="font-weight:500;color:#1ABC9C;">{{ p.tom }}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Omisiones:</span><span style="font-weight:500;color:#E74C3C;">{{ p.om }}</span></div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Gráfica de adherencia (SVG simple) -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+  <div class="card">
+    <div class="card-header"><h3>Adherencia — Últimos 14 días</h3></div>
+    <div class="card-body">
+      <svg viewBox="0 0 400 180" style="width:100%;">
+        <!-- Ejes -->
+        <line x1="40" y1="10" x2="40" y2="155" stroke="#E8ECF0" stroke-width="1"/>
+        <line x1="40" y1="155" x2="390" y2="155" stroke="#E8ECF0" stroke-width="1"/>
+        <!-- Líneas grid -->
+        {% for pct, y in [(100,10),(75,47),(50,85),(25,120)] %}
+        <line x1="40" y1="{{ y }}" x2="390" y2="{{ y }}" stroke="#F0F2F5" stroke-width="1"/>
+        <text x="34" y="{{ y+4 }}" text-anchor="end" font-size="9" fill="#9CA3AF">{{ pct }}</text>
+        {% endfor %}
+        <!-- Zona 80% -->
+        <rect x="40" y="10" width="350" height="37" fill="rgba(26,188,156,.05)"/>
+        <!-- Línea de datos -->
+        <polyline points="
+          40,49  65,26  90,55  115,14  140,33  165,49  190,72  215,40  240,59  265,46  290,37  315,49  340,14  365,26
+        " fill="none" stroke="#1B4F72" stroke-width="2.5" stroke-linejoin="round"/>
+        <!-- Puntos -->
+        {% for pt in [(40,49),(65,26),(90,55),(115,14),(140,33),(165,49),(190,72),(215,40),(240,59),(265,46),(290,37),(315,49),(340,14),(365,26)] %}
+        <circle cx="{{ pt[0] }}" cy="{{ pt[1] }}" r="3.5" fill="#1B4F72" stroke="white" stroke-width="1.5"/>
+        {% endfor %}
+        <!-- Labels X -->
+        {% for lbl, x in [("M1",40),("M3",90),("M5",140),("M7",190),("M9",240),("M11",290),("M13",340)] %}
+        <text x="{{ x }}" y="168" text-anchor="middle" font-size="9" fill="#9CA3AF">{{ lbl }}</text>
+        {% endfor %}
+      </svg>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Dosis por resultado</h3></div>
+    <div class="card-body">
+      <svg viewBox="0 0 360 180" style="width:100%;">
+        <!-- Barras -->
+        {% for bar in [
+          {"lbl":"CORRECTO","val":42,"y":60,"color":"#1ABC9C"},
+          {"lbl":"FUERA_H.","val":8, "y":100,"color":"#F39C12"},
+          {"lbl":"NO_TOMADO","val":4,"y":140,"color":"#E74C3C"}
+        ] %}
+        <rect x="60" y="{{ bar.y - (bar.val * 2.5)|int }}" width="60" height="{{ (bar.val * 2.5)|int }}"
+          rx="4" fill="{{ bar.color }}"/>
+        <text x="90" y="{{ bar.y + 14 }}" text-anchor="middle" font-size="9" fill="#9CA3AF">{{ bar.lbl }}</text>
+        <text x="90" y="{{ bar.y - (bar.val * 2.5)|int - 5 }}" text-anchor="middle" font-size="11" font-weight="700" fill="{{ bar.color }}">{{ bar.val }}</text>
+        {% endfor %}
+        <!-- Eje X -->
+        <line x1="30" y1="140" x2="330" y2="140" stroke="#E8ECF0" stroke-width="1"/>
+      </svg>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

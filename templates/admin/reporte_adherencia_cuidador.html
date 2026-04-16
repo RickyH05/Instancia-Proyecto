@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Adherencia por Cuidador{% endblock %}
+{% block page_title %}Adherencia por Cuidador{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Adherencia por cuidador</h1><p>Resumen de cumplimiento agrupado por cuidador responsable</p></div>
+</div>
+
+<form method="GET" action="{{ url_for('admin_reporte_adherencia_cuidador') }}"
+      style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <label class="form-label" style="margin:0;white-space:nowrap;">Ultimos</label>
+    <select name="dias" class="form-control" style="width:110px;" onchange="this.form.submit()">
+      {% for d in [7,14,30,60,90] %}
+      <option value="{{ d }}" {% if d == dias %}selected{% endif %}>{{ d }} dias</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por nombre de cuidador..."/>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Cuidador</th><th style="text-align:center;">Total citas</th>
+        <th style="text-align:center;">Exitosas</th>
+        <th style="text-align:center;">Tardias</th>
+        <th style="text-align:center;">Omitidas</th>
+        <th style="text-align:center;">Adherencia %</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-searchable>
+          <td style="font-weight:500;">{{ r[1] }}</td>
+          <td style="text-align:center;font-size:13px;">{{ r[2] }}</td>
+          <td style="text-align:center;">
+            <span class="badge badge-green">{{ r[3] }}</span>
+          </td>
+          <td style="text-align:center;">
+            <span class="badge badge-yellow">{{ r[4] }}</span>
+          </td>
+          <td style="text-align:center;">
+            <span class="badge badge-red">{{ r[5] }}</span>
+          </td>
+          <td style="text-align:center;">
+            {% set pct = r[6]|float if r[6] else 0 %}
+            <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
+              <div style="width:80px;height:6px;border-radius:3px;background:#E5E7EB;overflow:hidden;">
+                <div style="width:{{ pct }}%;height:100%;border-radius:3px;background:{% if pct >= 80 %}#1ABC9C{% elif pct >= 60 %}#F39C12{% else %}#E74C3C{% endif %};"></div>
+              </div>
+              <span style="font-size:13px;font-weight:600;color:{% if pct >= 80 %}#16a085{% elif pct >= 60 %}#d68910{% else %}#c0392b{% endif %};">
+                {{ "%.1f"|format(pct) }}%
+              </span>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:32px;">Sin datos para el periodo seleccionado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Mapa de Proximidad{% endblock %}
+{% block page_title %}Mapa de Proximidad{% endblock %}
+{% block content %}
+<div style="margin-bottom:20px;">
+  <p style="font-size:14px;color:#5D6D7E;">Visualización de beacons BLE, GPS y eventos de proximidad</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;">
+  <!-- Mapa SVG -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Mapa interactivo — Zona CDMX</h3>
+      <div style="display:flex;gap:12px;font-size:12px;color:#5D6D7E;">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1B4F72;vertical-align:middle;margin-right:4px;"></span>Beacon</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1ABC9C;vertical-align:middle;margin-right:4px;"></span>Válido</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E74C3C;vertical-align:middle;margin-right:4px;"></span>Sin proximidad</span>
+      </div>
+    </div>
+    <div class="card-body" style="padding:0 16px 16px;">
+      <svg viewBox="0 0 680 440" style="width:100%;background:#EEF2F7;border-radius:8px;">
+        <!-- Grid -->
+        {% for i in range(7) %}
+        <line x1="{{ 20 + i*93 }}" y1="20" x2="{{ 20 + i*93 }}" y2="420" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
+        {% endfor %}
+        {% for i in range(5) %}
+        <line x1="20" y1="{{ 20 + i*100 }}" x2="660" y2="{{ 20 + i*100 }}" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
+        {% endfor %}
+        <!-- Calles simuladas -->
+        <rect x="60" y="200" width="580" height="4" rx="2" fill="#CBD5E1"/>
+        <rect x="300" y="40"  width="4" height="380" rx="2" fill="#CBD5E1"/>
+        <rect x="60" y="340" width="580" height="4" rx="2" fill="#CBD5E1"/>
+        <rect x="480" y="40"  width="4" height="380" rx="2" fill="#CBD5E1"/>
+        <!-- Beacons con cobertura -->
+        {% for b in [
+          {"cx":200,"cy":115,"r":60,"lbl":"Beacon Sala - López"},
+          {"cx":210,"cy":122,"r":36,"lbl":"Beacon Recámara"},
+          {"cx":280,"cy":250,"r":48,"lbl":"Beacon Torres"},
+          {"cx":290,"cy":260,"r":60,"lbl":"Beacon Sala - Ruiz"}
+        ] %}
+        <circle cx="{{ b.cx }}" cy="{{ b.cy }}" r="{{ b.r }}" fill="#1B4F72" fill-opacity="0.07" stroke="#1B4F72" stroke-width="1.5" stroke-dasharray="6 3"/>
+        <circle cx="{{ b.cx }}" cy="{{ b.cy }}" r="8" fill="#1B4F72" stroke="white" stroke-width="2"/>
+        <text x="{{ b.cx }}" y="{{ b.cy - 14 }}" text-anchor="middle" fill="#1B4F72" font-size="9" font-weight="600">{{ b.lbl }}</text>
+        {% endfor %}
+        <!-- Eventos válidos (verde) -->
+        {% for pt in [(200,115),(200,118),(282,252),(293,265),(290,258)] %}
+        <circle cx="{{ pt[0] }}" cy="{{ pt[1] }}" r="5" fill="#1ABC9C" stroke="white" stroke-width="1.5" opacity="0.85"/>
+        {% endfor %}
+        <!-- Eventos inválidos (rojo) -->
+        {% for pt in [(285,248),(335,120),(210,118)] %}
+        <circle cx="{{ pt[0] }}" cy="{{ pt[1] }}" r="5" fill="#E74C3C" stroke="white" stroke-width="1.5" opacity="0.85"/>
+        {% endfor %}
+      </svg>
+    </div>
+  </div>
+
+  <!-- Panel estadísticas -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <div class="card">
+      <div class="card-header"><h3>Estadísticas</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+        {% for item in [
+          {"lbl":"Beacons activos","val":"4","icon":"radio","color":"#1B4F72","bg":"rgba(27,79,114,.10)"},
+          {"lbl":"Proximidad válida","val":"5","icon":"check-circle","color":"#1ABC9C","bg":"rgba(26,188,156,.12)"},
+          {"lbl":"Sin proximidad","val":"3","icon":"x-circle","color":"#E74C3C","bg":"rgba(231,76,60,.10)"}
+        ] %}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;background:#F4F6F8;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:8px;background:{{ item.bg }};display:flex;align-items:center;justify-content:center;">
+              <i data-lucide="{{ item.icon }}" style="width:16px;height:16px;color:{{ item.color }};"></i>
+            </div>
+            <span style="font-size:13px;color:#5D6D7E;">{{ item.lbl }}</span>
+          </div>
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:{{ item.color }};">{{ item.val }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>Tasa de Presencia</h3></div>
+      <div class="card-body">
+        <div style="display:flex;align-items:flex-end;gap:6px;margin-bottom:8px;">
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;color:#1B4F72;line-height:1;">62%</span>
+          <span style="font-size:13px;color:#5D6D7E;margin-bottom:4px;">de los eventos</span>
+        </div>
+        <div style="width:100%;height:10px;background:#E8ECF0;border-radius:5px;overflow:hidden;">
+          <div style="width:62%;height:100%;background:#1ABC9C;border-radius:5px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>Últimos eventos</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+        {% for ev in [
+          {"pac":"Juan López","med":"Metformina","d":"2.3m","ok":true},
+          {"pac":"Juan López","med":"Losartán","d":"2.5m","ok":true},
+          {"pac":"Ana Torres","med":"Enalapril","d":"3.1m","ok":true},
+          {"pac":"Ana Torres","med":"Furosemida","d":"12.8m","ok":false},
+          {"pac":"Carlos Ruiz","med":"Metformina","d":"1.5m","ok":true}
+        ] %}
+        <div style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;background:#F9FAFB;">
+          {% if ev.ok %}
+          <i data-lucide="check-circle-2" style="width:14px;height:14px;color:#1ABC9C;flex-shrink:0;"></i>
+          {% else %}
+          <i data-lucide="x-circle" style="width:14px;height:14px;color:#E74C3C;flex-shrink:0;"></i>
+          {% endif %}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:500;color:#2C3E50;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ ev.pac }}</div>
+            <div style="font-size:11px;color:#9CA3AF;">{{ ev.med }} · {{ ev.d }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}
