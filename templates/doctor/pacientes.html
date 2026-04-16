@@ -62,56 +62,45 @@
   <div class="modal-box" style="max-width:580px;">
     <div class="modal-header">
       <span class="modal-title">Nuevo Paciente</span>
-      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-nuevo-paciente')">
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-nuevo-paciente')">
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
+    <form method="post" action="{{ url_for('doctor_paciente_nuevo') }}">
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
         <div class="form-group">
           <label class="form-label">Nombre *</label>
-          <input class="form-control" placeholder="Juan"/>
+          <input class="form-control" name="nombre" placeholder="Juan" required/>
         </div>
         <div class="form-group">
           <label class="form-label">Ap. Paterno *</label>
-          <input class="form-control" placeholder="Lopez"/>
+          <input class="form-control" name="apellido_p" placeholder="Lopez" required/>
         </div>
         <div class="form-group">
           <label class="form-label">Ap. Materno</label>
-          <input class="form-control" placeholder="Martinez"/>
+          <input class="form-control" name="apellido_m" placeholder="Martinez"/>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="form-group">
           <label class="form-label">CURP *</label>
-          <input class="form-control" style="font-family:monospace;" placeholder="XXXX000000XXXXXXXX"
-            maxlength="18" oninput="this.value=this.value.toUpperCase()"/>
+          <input class="form-control" name="curp" style="font-family:monospace;" placeholder="XXXX000000XXXXXXXX"
+            maxlength="18" minlength="18" required oninput="this.value=this.value.toUpperCase()"/>
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de nacimiento</label>
-          <input class="form-control" type="date"/>
+          <input class="form-control" name="fecha_nac" type="date"/>
         </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Diagnosticos</label>
-        <input class="form-control" placeholder="Diabetes Tipo 2, HTA... (separados por coma)"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Cuidador principal</label>
-        <select class="form-control">
-          <option value="">— Seleccionar —</option>
-          <option>Maria Gomez Flores</option>
-          <option>Roberto Hernandez Diaz</option>
-          <option>Lucia Fernandez Rios</option>
-        </select>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-nuevo-paciente')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-nuevo-paciente')">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('modal-nuevo-paciente')">Cancelar</button>
+      <button type="submit" class="btn btn-primary">
         <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar Paciente
       </button>
     </div>
+    </form>
   </div>
 </div>
 

@@ -224,7 +224,8 @@ def admin_dashboard():
             FROM v_audit_cambios
             ORDER BY ts DESC LIMIT 5
         """)
-        actividad_reciente = cur.fetchall()
+        raw_act = cur.fetchall()
+        actividad_reciente = [(r[0], r[1], r[2], str(r[3])[:16]) for r in raw_act]
 
         cur.close(); conn.close()
     except Exception as e:
@@ -1285,11 +1286,29 @@ def doctor_pacientes():
     return render_template("doctor/pacientes.html", pacientes=pacientes)
 
 
-@app.route("/doctor/pacientes/nuevo")
+@app.route("/doctor/pacientes/nuevo", methods=["POST"])
 @login_requerido
 @rol_requerido("medico")
 def doctor_paciente_nuevo():
-    return render_template("doctor/paciente_nuevo.html")
+    nom  = request.form.get("nombre",    "").strip() or None
+    ap   = request.form.get("apellido_p","").strip() or None
+    am   = request.form.get("apellido_m","").strip() or None
+    curp = request.form.get("curp",      "").strip() or None
+    nac  = request.form.get("fecha_nac", "").strip() or None
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute(
+            "CALL sp_gestion_paciente('I', NULL, NULL, NULL, %s, %s, %s, %s, %s, NULL)",
+            [nom, ap, am, nac, curp],
+        )
+        _, p_ok, p_msg = cur.fetchone()
+        conn.commit()
+        cur.close(); conn.close()
+        flash(p_msg, "success" if p_ok == 1 else "danger")
+    except Exception as e:
+        flash(f"Error al crear paciente: {e}", "danger")
+    return redirect(url_for("doctor_pacientes"))
 
 
 @app.route("/doctor/pacientes/<int:id>")
@@ -1720,14 +1739,14 @@ def doctor_mapa():
 @login_requerido
 @rol_requerido("medico")
 def doctor_receta_nueva(id):
-    return render_template("doctor/receta_nueva.html", id=id)
+    return redirect(url_for("doctor_paciente_perfil", id=id))
 
 
 @app.route("/doctor/pacientes/<int:id>/asignar-cuidador")
 @login_requerido
 @rol_requerido("medico")
 def doctor_asignar_cuidador(id):
-    return render_template("doctor/asignar_cuidador.html", id=id)
+    return redirect(url_for("doctor_paciente_perfil", id=id))
 
 
 @app.route("/doctor/recetas")
@@ -1794,7 +1813,26 @@ def doctor_recetas():
 @login_requerido
 @rol_requerido("medico")
 def doctor_reportes():
-    return render_template("doctor/reportes.html")
+    from datetime import datetime, timedelta
+    id_medico = session["id_rol"]
+    dias = request.args.get("dias", 30, type=int)
+    pacientes_adh = []
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        fecha_desde = datetime.now() - timedelta(days=dias)
+        cur.execute("""
+            SELECT DISTINCT id_paciente, paciente, total, ok, tarde, omitida, pend, pct
+            FROM v_adherencia_paciente_por_medico
+            WHERE id_medico = %s
+              AND fecha_hora_programada >= %s
+            ORDER BY paciente
+        """, [id_medico, fecha_desde])
+        pacientes_adh = cur.fetchall()
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar reportes: {e}", "danger")
+    return render_template("doctor/reportes.html", pacientes_adh=pacientes_adh, dias=dias)
 
 
 @app.route("/doctor/configuracion")
@@ -2261,10 +2299,10 @@ def cuidador_mi_gps():
             id_gps, imei, modelo, activo = row
             gps = {"id": id_gps, "imei": imei, "modelo": modelo, "activo": activo}
             cur.execute("""
-                SELECT lat, lon, timestamp_gps
+                SELECT latitud, longitud, timestamp_ubicacion
                 FROM ubicacion_gps
                 WHERE id_gps = %s
-                ORDER BY timestamp_gps DESC LIMIT 5
+                ORDER BY timestamp_ubicacion DESC LIMIT 5
             """, [id_gps])
             rows = cur.fetchall()
             for lat, lon, ts in rows:

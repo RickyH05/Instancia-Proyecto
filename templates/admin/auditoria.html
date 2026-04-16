@@ -1,47 +1,50 @@
 {% extends "base.html" %}
-{% block title %}Auditoria{% endblock %}
-{% block page_title %}Auditoria{% endblock %}
+{% block title %}Auditoría{% endblock %}
+{% block page_title %}Auditoría{% endblock %}
 {% block content %}
 <div class="page-header">
-  <div><h1>Auditoria</h1><p>Registro de operaciones del sistema</p></div>
-  <button class="btn btn-primary" onclick="alert('Exportar CSV — conectar con BD')">
-    <i data-lucide="download" style="width:16px;height:16px;"></i> Exportar CSV
-  </button>
+  <div><h1>Auditoría</h1><p>Registro de operaciones del sistema</p></div>
 </div>
-<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
-  <input type="date" class="form-control" style="max-width:160px;" value="2026-01-01"/>
-  <input type="date" class="form-control" style="max-width:160px;" value="2026-03-31"/>
-  <div class="filter-pills" style="margin:0;">
-    <span class="pill active">Todas</span>
-    <span class="pill">INSERT</span><span class="pill">UPDATE</span><span class="pill">DELETE</span>
-  </div>
-</div>
+<form method="get" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+  <select name="tabla" class="form-control" style="max-width:200px;">
+    <option value="">— Todas las tablas —</option>
+    {% for t in ['paciente','medico','cuidador','usuario','medicamento'] %}
+    <option value="{{ t }}" {% if tabla == t %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+  </select>
+  <select name="limite" class="form-control" style="max-width:120px;">
+    {% for l in [50, 100, 200] %}
+    <option value="{{ l }}" {% if limite == l %}selected{% endif %}>{{ l }} registros</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+</form>
 <div class="card">
   <div class="table-wrap"><table>
-    <thead><tr><th>#</th><th>Tabla afectada</th><th>Registro</th><th>Operacion</th><th>Usuario</th><th>Fecha/Hora</th></tr></thead>
+    <thead><tr>
+      <th>#</th><th>Tabla</th><th>Registro</th><th>Acción</th>
+      <th>Campo</th><th>Antes</th><th>Después</th><th>Usuario</th><th>Fecha/Hora</th>
+    </tr></thead>
     <tbody>
-      {% for r in [
-        {"id":1, "tabla":"EVENTO_NFC",     "rec":1001,"op":"INSERT","usr":"sys_nfc",     "ts":"2026-03-24 08:03"},
-        {"id":2, "tabla":"ALERTA",         "rec":1,   "op":"INSERT","usr":"sys_trigger", "ts":"2026-03-24 08:15"},
-        {"id":3, "tabla":"RECETA",         "rec":1,   "op":"UPDATE","usr":"admin_01",    "ts":"2026-03-24 09:00"},
-        {"id":4, "tabla":"ETIQUETA_NFC",   "rec":1,   "op":"UPDATE","usr":"admin_01",    "ts":"2026-03-23 15:30"},
-        {"id":5, "tabla":"PACIENTE",       "rec":4,   "op":"INSERT","usr":"admin_01",    "ts":"2026-03-22 11:00"},
-        {"id":6, "tabla":"MEDICAMENTO",    "rec":7,   "op":"UPDATE","usr":"admin_01",    "ts":"2026-03-20 14:30"},
-        {"id":7, "tabla":"MEDICO",         "rec":3,   "op":"INSERT","usr":"admin_02",    "ts":"2026-03-19 09:00"},
-        {"id":8, "tabla":"BEACON",         "rec":2,   "op":"INSERT","usr":"admin_01",    "ts":"2026-03-18 10:00"}
-      ] %}
+      {% for r in rows %}
+      {# cols: id_audit, tabla, id_reg, accion, campo, val_antes, val_despues, usuario_db, id_usr_app, ts #}
       <tr data-searchable>
-        <td style="color:#9CA3AF;font-size:12px;">{{ r.id }}</td>
-        <td style="font-family:monospace;font-size:13px;font-weight:500;">{{ r.tabla }}</td>
-        <td style="font-size:13px;color:#5D6D7E;">#{{ r.rec }}</td>
+        <td style="color:#9CA3AF;font-size:12px;">{{ r[0] }}</td>
+        <td style="font-family:monospace;font-size:13px;font-weight:500;">{{ r[1] }}</td>
+        <td style="font-size:13px;color:#5D6D7E;">#{{ r[2] }}</td>
         <td>
-          <span class="badge {% if r.op=='INSERT' %}badge-green{% elif r.op=='UPDATE' %}badge-yellow{% else %}badge-red{% endif %}">
-            {{ r.op }}
+          <span class="badge {% if r[3]=='INSERT' %}badge-green{% elif r[3]=='UPDATE' %}badge-yellow{% else %}badge-red{% endif %}">
+            {{ r[3] }}
           </span>
         </td>
-        <td style="font-size:13px;color:#5D6D7E;">{{ r.usr }}</td>
-        <td style="font-size:13px;color:#5D6D7E;">{{ r.ts }}</td>
+        <td style="font-family:monospace;font-size:12px;color:#5D6D7E;">{{ r[4] or '—' }}</td>
+        <td style="font-size:12px;color:#9CA3AF;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r[5] }}">{{ r[5] or '—' }}</td>
+        <td style="font-size:12px;color:#2C3E50;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r[6] }}">{{ r[6] or '—' }}</td>
+        <td style="font-size:13px;color:#5D6D7E;">{{ r[8] or r[7] or '—' }}</td>
+        <td style="font-size:13px;color:#5D6D7E;">{{ r[9]|string|truncate(16,true,'') }}</td>
       </tr>
+      {% else %}
+      <tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:32px;">Sin registros de auditoría.</td></tr>
       {% endfor %}
     </tbody>
   </table></div>

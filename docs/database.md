@@ -59,7 +59,18 @@ rows = cur.fetchall()
 | `prioridad_alerta_enum` | `'Alta'`, `'Media'`, `'Baja'` |
 
 ---
+## Nombres reales de columnas (errores comunes)
 
+Estos son nombres que se suelen equivocar — usar EXACTAMENTE así:
+
+| Tabla | Columnas correctas |
+|-------|-------------------|
+| paciente, medico, cuidador | apellido_p, apellido_m (NO apellido_paterno/materno) |
+| medicamento | dosis_max (NO dosis_maxima) |
+| ubicacion_gps | latitud, longitud, timestamp_ubicacion (NO lat/lon/timestamp_gps) |
+| alerta | id_estado (NO estado) — JOIN con estado_alerta para descripción |
+| beacon | latitud_ref, longitud_ref, radio_metros |
+| evento_nfc | timestamp_lectura, fecha_registro, desfase_min |
 ## Tablas catálogo (IDs fijos en producción)
 
 ### `resultado_validacion`
@@ -542,48 +553,22 @@ conn.commit()
 
 ---
 
-## 12. Login y Sesión
+## 12. Login
 
-### `sp_login`
+**NOTA:** `sp_login` existe en la BD pero NO se usa desde Flask. 
+La verificación bcrypt tiene que pasar por Python, no por el SP.
 
-Autentica un usuario. Registra el intento en `log_acceso` (exitoso o fallido). Actualiza `ultimo_acceso` si es exitoso.
+Flujo correcto de login:
+1. SELECT password_hash FROM usuario WHERE email = %s AND activo = TRUE
+2. bcrypt.checkpw(password.encode(), stored_hash.encode())
+3. Si OK: INSERT en log_acceso con exitoso=TRUE
+4. Si falla: INSERT en log_acceso con exitoso=FALSE
+5. Guardar en session: user_id, rol, id_rol, nombre
 
-**Firma completa:**
-```sql
-CALL sp_login(
-    p_email  VARCHAR(150) IN,
-    p_hash   VARCHAR(255) IN,   -- password ya hasheada (SHA256/bcrypt desde Flask)
-    p_ok     INTEGER OUT,
-    p_msg    VARCHAR(300) OUT,
-    p_id_usr INTEGER OUT,       -- id del usuario autenticado
-    p_rol    VARCHAR(30) OUT,   -- 'medico' | 'cuidador'
-    p_id_rol INTEGER OUT,       -- id_medico o id_cuidador según rol
-    p_ip     VARCHAR(45) DEFAULT NULL  -- IP del cliente (opcional)
-)
-```
+El nombre se obtiene con JOIN a medico o cuidador según rol_usuario.
 
-**Ejemplo psycopg2:**
-```python
-import hashlib
-password_hash = hashlib.sha256('mi_password'.encode()).hexdigest()
-
-cur.execute("CALL sp_login(%s, %s, NULL, NULL, NULL, NULL, NULL, %s)",
-            [email, password_hash, request.remote_addr])
-p_ok, p_msg, p_id_usr, p_rol, p_id_rol = cur.fetchone()
-conn.commit()
-
-if p_ok == 1:
-    session['user_id'] = p_id_usr
-    session['rol'] = p_rol
-    session['id_rol'] = p_id_rol  # id_medico o id_cuidador
-```
-
-**Nota de auditoría:** Para que el trigger de auditoría registre correctamente el usuario de aplicación:
-```python
-cur.execute("SELECT set_config('medi_nfc2.id_usuario_app', %s, TRUE)", [str(session['user_id'])])
-```
-
----
+Admin especial: credenciales en variables de entorno 
+(ADMIN_EMAIL, ADMIN_PASSWORD_HASH). No vive en la tabla usuario.
 
 ## 13. Omisiones (Proceso Batch)
 

@@ -1,36 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Configuracion{% endblock %}
-{% block page_title %}Configuracion{% endblock %}
+{% block title %}Configuración{% endblock %}
+{% block page_title %}Configuración{% endblock %}
 {% block content %}
 <div style="max-width:640px;">
   <div class="card" style="margin-bottom:20px;">
     <div class="card-header"><h3>Perfil de Administrador</h3></div>
     <div class="card-body">
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
-        <div style="width:56px;height:56px;border-radius:50%;background:#1B4F72;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:white;">CA</div>
+        <div style="width:56px;height:56px;border-radius:50%;background:#1B4F72;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:white;">
+          {{ session['nombre'][:2].upper() }}
+        </div>
         <div>
-          <div style="font-weight:600;font-size:15px;">Carlos Mendoza</div>
-          <div style="font-size:13px;color:#5D6D7E;">Hospital Admin</div>
+          <div style="font-weight:600;font-size:15px;">{{ session['nombre'] }}</div>
+          <div style="font-size:13px;color:#5D6D7E;">Administrador del sistema</div>
         </div>
       </div>
-      <div class="form-group"><label class="form-label">Nombre</label><input class="form-control" value="Carlos Mendoza"/></div>
-      <div class="form-group"><label class="form-label">Correo electronico</label><input class="form-control" type="text" value="admin [at] medinfc.com"/></div>
-      <button class="btn btn-primary">Guardar cambios</button>
-    </div>
-  </div>
-  <div class="card" style="margin-bottom:20px;">
-    <div class="card-header"><h3>Cambiar Contrasena</h3></div>
-    <div class="card-body">
-      <div class="form-group"><label class="form-label">Contrasena actual</label><input class="form-control" type="password"/></div>
-      <div class="form-group"><label class="form-label">Nueva contrasena</label><input class="form-control" type="password"/></div>
-      <div class="form-group"><label class="form-label">Confirmar nueva</label><input class="form-control" type="password"/></div>
-      <button class="btn btn-primary">Cambiar contrasena</button>
+      <div class="form-group">
+        <label class="form-label">Nombre</label>
+        <input class="form-control" value="{{ session['nombre'] }}" disabled title="El perfil de administrador se configura en variables de entorno."/>
+      </div>
+      <p style="font-size:12px;color:#9CA3AF;">Las credenciales del administrador se gestionan en el archivo <code>.env</code> del servidor.</p>
     </div>
   </div>
   <div class="card">
-    <div class="card-header"><h3>Informacion del Sistema</h3></div>
+    <div class="card-header"><h3>Información del Sistema</h3></div>
     <div class="card-body">
-      {% for row in [("Version","MediNFC v1.0.0"),("Entorno","Produccion"),("Ultimo deploy","2026-03-14 06:00"),("Base de datos","PostgreSQL 15")] %}
+      {% for row in [("Versión","MediNFC v1.0.0"),("Entorno","Producción"),("Base de datos","PostgreSQL 15")] %}
       <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:14px;">
         <span style="color:#5D6D7E;">{{ row[0] }}</span>
         <span style="font-weight:500;color:#2C3E50;">{{ row[1] }}</span>
