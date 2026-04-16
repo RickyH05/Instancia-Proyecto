@@ -6,6 +6,7 @@
   <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver
 </a>
 
+{% if gps %}
 <!-- Status card -->
 <div class="card" style="margin-bottom:16px;">
   <div class="card-body">
@@ -15,84 +16,76 @@
       </div>
       <div style="flex:1;">
         <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-weight:600;font-size:16px;">Queclink GL300</span>
+          <span style="font-weight:600;font-size:16px;">{{ gps.modelo }}</span>
+          {% if gps.activo %}
           <span class="badge badge-green">Conectado</span>
+          {% else %}
+          <span class="badge badge-gray">Inactivo</span>
+          {% endif %}
         </div>
-        <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">Asignado a: María Gómez</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
       <div style="background:#F4F6F8;border-radius:8px;padding:12px;">
         <div style="font-size:11px;color:#5D6D7E;font-weight:500;">IMEI</div>
-        <div style="font-family:monospace;font-size:13px;font-weight:600;margin-top:2px;">356938035643809</div>
+        <div style="font-family:monospace;font-size:13px;font-weight:600;margin-top:2px;">{{ gps.imei }}</div>
       </div>
       <div style="background:#F4F6F8;border-radius:8px;padding:12px;">
         <div style="font-size:11px;color:#5D6D7E;font-weight:500;">Modelo</div>
-        <div style="font-size:13px;font-weight:600;margin-top:2px;">Queclink GL300</div>
+        <div style="font-size:13px;font-weight:600;margin-top:2px;">{{ gps.modelo }}</div>
       </div>
     </div>
   </div>
 </div>
 
+{% if ultima_ubicacion %}
 <!-- Última ubicación -->
 <div class="card" style="margin-bottom:16px;">
   <div class="card-header">
     <h3>Última Ubicación</h3>
-    <span style="font-size:12px;color:#5D6D7E;">2026-03-24 09:15</span>
+    <span style="font-size:12px;color:#5D6D7E;">{{ ultima_ubicacion.ts }}</span>
   </div>
   <div class="card-body">
-    <!-- Mini mapa SVG -->
     <svg viewBox="0 0 480 240" style="width:100%;background:#EEF2F7;border-radius:8px;margin-bottom:12px;">
-      <!-- Grid lines -->
       <line x1="0" y1="80"  x2="480" y2="80"  stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
       <line x1="0" y1="160" x2="480" y2="160" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
       <line x1="120" y1="0" x2="120" y2="240" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
       <line x1="240" y1="0" x2="240" y2="240" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
       <line x1="360" y1="0" x2="360" y2="240" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
-      <!-- Calles -->
       <rect x="0" y="110" width="480" height="4" rx="2" fill="#CBD5E1"/>
       <rect x="220" y="0"  width="4" height="240" rx="2" fill="#CBD5E1"/>
-      <!-- Ruta -->
-      <polyline points="60,180 110,155 165,130 200,115" fill="none" stroke="#1B4F72" stroke-width="2" stroke-dasharray="6 3" opacity="0.5"/>
-      <!-- Puntos -->
-      <circle cx="110" cy="155" r="4" fill="#1B4F72" stroke="white" stroke-width="1.5" opacity="0.5"/>
-      <circle cx="165" cy="130" r="4" fill="#1B4F72" stroke="white" stroke-width="1.5" opacity="0.5"/>
-      <!-- Posición actual -->
-      <circle cx="200" cy="115" r="16" fill="#1ABC9C" fill-opacity="0.15"/>
-      <circle cx="200" cy="115" r="8"  fill="#1ABC9C" stroke="white" stroke-width="2.5"/>
-      <text x="200" y="99" text-anchor="middle" fill="#1ABC9C" font-size="10" font-weight="600">Actual</text>
+      <circle cx="240" cy="120" r="16" fill="#1ABC9C" fill-opacity="0.15"/>
+      <circle cx="240" cy="120" r="8"  fill="#1ABC9C" stroke="white" stroke-width="2.5"/>
+      <text x="240" y="104" text-anchor="middle" fill="#1ABC9C" font-size="10" font-weight="600">Actual</text>
     </svg>
     <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(26,188,156,.06);border:1px solid rgba(26,188,156,.15);border-radius:8px;">
       <i data-lucide="map-pin" style="width:16px;height:16px;color:#1ABC9C;flex-shrink:0;"></i>
       <div>
-        <div style="font-size:12px;font-weight:600;color:#2C3E50;">Lat: 19.4326, Lng: -99.1332</div>
-        <div style="font-size:11px;color:#5D6D7E;">En domicilio del paciente</div>
+        <div style="font-size:12px;font-weight:600;color:#2C3E50;">Lat: {{ ultima_ubicacion.lat }}, Lng: {{ ultima_ubicacion.lon }}</div>
+        <div style="font-size:11px;color:#5D6D7E;">Última posición registrada</div>
       </div>
     </div>
   </div>
 </div>
+{% endif %}
 
 <!-- Timeline posiciones -->
+{% if posiciones %}
 <div class="card">
   <div class="card-header"><h3>Posiciones Recientes</h3></div>
   <div class="card-body">
     <div class="timeline">
-      {% for pos in [
-        {"ts":"09:15","ev":"En domicilio paciente","lat":"19.4326","lng":"-99.1332","active":true},
-        {"ts":"08:45","ev":"En tránsito",          "lat":"19.4310","lng":"-99.1340","active":false},
-        {"ts":"08:30","ev":"En tránsito",          "lat":"19.4290","lng":"-99.1360","active":false},
-        {"ts":"08:00","ev":"Inicio de ruta",       "lat":"19.4260","lng":"-99.1380","active":false}
-      ] %}
+      {% for pos in posiciones %}
       <div class="timeline-item">
         <div class="timeline-spine">
           <div style="font-size:11px;color:#5D6D7E;font-weight:600;white-space:nowrap;min-width:38px;">{{ pos.ts }}</div>
-          <div class="timeline-dot {% if pos.active %}green{% else %}gray{% endif %}" style="margin:6px 0 0;"></div>
+          <div class="timeline-dot {% if loop.first %}green{% else %}gray{% endif %}" style="margin:6px 0 0;"></div>
           <div class="timeline-line"></div>
         </div>
         <div class="timeline-content" style="padding-left:4px;">
-          <div class="timeline-card" style="border-left:3px solid {% if pos.active %}#1ABC9C{% else %}#E8ECF0{% endif %};">
-            <div style="font-weight:600;font-size:13px;color:#2C3E50;">{{ pos.ev }}</div>
-            <div style="font-family:monospace;font-size:11px;color:#9CA3AF;margin-top:2px;">{{ pos.lat }}, {{ pos.lng }}</div>
+          <div class="timeline-card" style="border-left:3px solid {% if loop.first %}#1ABC9C{% else %}#E8ECF0{% endif %};">
+            <div style="font-weight:600;font-size:13px;color:#2C3E50;">{{ 'Posición actual' if loop.first else 'Posición anterior' }}</div>
+            <div style="font-family:monospace;font-size:11px;color:#9CA3AF;margin-top:2px;">{{ pos.lat }}, {{ pos.lon }}</div>
           </div>
         </div>
       </div>
@@ -100,5 +93,17 @@
     </div>
   </div>
 </div>
+{% endif %}
+
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:48px;color:#9CA3AF;">
+    <i data-lucide="smartphone" style="width:40px;height:40px;margin-bottom:12px;opacity:0.4;"></i>
+    <div style="font-size:15px;font-weight:600;">Sin dispositivo GPS asignado</div>
+    <div style="font-size:13px;margin-top:6px;">Contacta al administrador para asignar un dispositivo.</div>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}
 {% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

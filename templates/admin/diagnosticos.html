@@ -15,51 +15,24 @@
     <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
     <input id="search-input" class="form-control" placeholder="Buscar diagnostico..."/>
   </div>
-  <div class="filter-pills" style="margin:0;">
-    <span class="pill active">Todos</span>
-    <span class="pill">Activos</span>
-    <span class="pill">Inactivos</span>
-  </div>
 </div>
 
 <div class="card">
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>#</th><th>Descripcion</th><th>Pacientes con este diagnostico</th>
-        <th>Estado</th><th style="text-align:right;">Acciones</th>
+        <th>#</th><th>Descripcion</th><th style="text-align:right;">Acciones</th>
       </tr></thead>
       <tbody>
-        {% for d in [
-          {"id":1,"desc":"Diabetes Tipo 2",        "pac":3,"activo":true},
-          {"id":2,"desc":"Hipertension Arterial",   "pac":2,"activo":true},
-          {"id":3,"desc":"Insuficiencia Cardiaca",  "pac":1,"activo":true},
-          {"id":4,"desc":"Osteoporosis",            "pac":1,"activo":true},
-          {"id":5,"desc":"EPOC",                   "pac":1,"activo":true},
-          {"id":6,"desc":"Hipotiroidismo",          "pac":1,"activo":true},
-          {"id":7,"desc":"Dislipidemia",            "pac":0,"activo":true},
-          {"id":8,"desc":"Artritis Reumatoide",     "pac":0,"activo":false}
-        ] %}
+        {% for d in diagnosticos %}
+        {# d: (0=id, 1=descripcion) #}
         <tr data-searchable>
-          <td style="color:#9CA3AF;font-size:13px;">{{ d.id }}</td>
-          <td style="font-weight:500;">{{ d.desc }}</td>
-          <td style="text-align:center;">
-            <span style="font-size:13px;{% if d.pac > 0 %}font-weight:600;color:#1B4F72;{% else %}color:#9CA3AF;{% endif %}">
-              {{ d.pac }} paciente{{ 's' if d.pac != 1 else '' }}
-            </span>
-          </td>
-          <td>
-            {% if d.activo %}<span class="badge badge-green">Activo</span>
-            {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
-          </td>
+          <td style="color:#9CA3AF;font-size:13px;">{{ d[0] }}</td>
+          <td style="font-weight:500;">{{ d[1] }}</td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
-              onclick="editDx({{ d.id }},'{{ d.desc }}',{{ 'true' if d.activo else 'false' }})">
+              onclick="editDx({{ d[0] }},'{{ d[1]|e }}')">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
-            </button>
-            <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
-              onclick="openConfirm('Eliminar diagnostico: {{ d.desc }}?',{% if d.pac > 0 %}'ADVERTENCIA: {{ d.pac }} paciente(s) tienen este diagnostico asignado.'{% else %}'Esta accion no se puede deshacer.'{% endif %})">
-              <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
             </button>
           </td>
         </tr>
@@ -78,51 +51,22 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Descripcion *</label>
-        <input class="form-control" id="dx-desc" placeholder="Ej: Diabetes Tipo 2"/>
-      </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:12px;">
-        <label class="form-label" style="margin:0;">Activo</label>
-        <input type="checkbox" id="dx-activo" checked style="width:18px;height:18px;accent-color:#1B4F72;cursor:pointer;"/>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-dx')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-dx')">
-        <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal confirmar eliminar -->
-<div id="modal-confirm" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-confirm')">
-  <div class="modal-box" style="max-width:420px;">
-    <div class="modal-header">
-      <span class="modal-title" style="color:#E74C3C;">Confirmar eliminacion</span>
-      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-confirm')">
-        <i data-lucide="x" style="width:16px;height:16px;"></i>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
-        </div>
-        <div>
-          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
-          <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+    <form method="POST" action="{{ url_for('admin_diagnosticos') }}">
+      <input type="hidden" id="dx-acc" name="acc" value="I">
+      <input type="hidden" id="dx-id" name="id_diagnostico" value="">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Descripcion *</label>
+          <input class="form-control" id="dx-desc" name="descripcion" placeholder="Ej: Diabetes Tipo 2"/>
         </div>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
-      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
-        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
-      </button>
-    </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-dx')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -131,18 +75,15 @@
 lucide.createIcons();
 function setModoNuevo(){
   document.getElementById('modal-dx-title').textContent='Nuevo Diagnostico';
+  document.getElementById('dx-acc').value='I';
+  document.getElementById('dx-id').value='';
   document.getElementById('dx-desc').value='';
-  document.getElementById('dx-activo').checked=true;
 }
-function editDx(id,desc,activo){
+function editDx(id,desc){
   document.getElementById('modal-dx-title').textContent='Editar Diagnostico';
+  document.getElementById('dx-acc').value='U';
+  document.getElementById('dx-id').value=id;
   document.getElementById('dx-desc').value=desc;
-  document.getElementById('dx-activo').checked=activo;
   openModal('modal-dx'); lucide.createIcons();
-}
-function openConfirm(title,msg){
-  document.getElementById('confirm-title').textContent=title;
-  document.getElementById('confirm-msg').textContent=msg;
-  openModal('modal-confirm'); lucide.createIcons();
 }
 </script>{% endblock %}

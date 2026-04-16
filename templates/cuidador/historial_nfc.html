@@ -4,25 +4,19 @@
 {% block content %}
 
 <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-  <select class="form-control" style="max-width:200px;">
-    <option>Todos los pacientes</option>
-    <option>Juan Lopez</option>
-    <option>Ana Torres</option>
-    <option>Carlos Ruiz</option>
-  </select>
-  <input type="date" class="form-control" style="max-width:180px;" value="2026-03-24"/>
+  <input type="date" class="form-control" style="max-width:180px;"/>
 </div>
 
 <!-- Resumen -->
 <div class="stats-grid stats-grid-3" style="margin-bottom:20px;">
   <div class="stat-card" style="padding:14px;">
-    <div><div class="stat-label">Tomadas ✅</div><div class="stat-value" style="color:#1ABC9C;font-size:26px;">5</div></div>
+    <div><div class="stat-label">Tomadas ✅</div><div class="stat-value" style="color:#1ABC9C;font-size:26px;">{{ stats.ok }}</div></div>
   </div>
   <div class="stat-card" style="padding:14px;">
-    <div><div class="stat-label">Omisiones ❌</div><div class="stat-value" style="color:#E74C3C;font-size:26px;">1</div></div>
+    <div><div class="stat-label">Omisiones ❌</div><div class="stat-value" style="color:#E74C3C;font-size:26px;">{{ stats.omitidas }}</div></div>
   </div>
   <div class="stat-card" style="padding:14px;">
-    <div><div class="stat-label">Fuera horario ⚠️</div><div class="stat-value" style="color:#F39C12;font-size:26px;">2</div></div>
+    <div><div class="stat-label">Fuera horario ⚠️</div><div class="stat-value" style="color:#F39C12;font-size:26px;">{{ stats.fuera }}</div></div>
   </div>
 </div>
 
@@ -34,20 +28,14 @@
         <th>Origen</th><th style="text-align:right;">Acciones</th>
       </tr></thead>
       <tbody>
-        {% for ev in [
-          {"id":"e1","time":"08:06","pac":"Juan Lopez","med":"Losartan 50mg",    "res":"CORRECTO",     "orig":"NFC"},
-          {"id":"e2","time":"08:05","pac":"Juan Lopez","med":"Metformina 500mg", "res":"CORRECTO",     "orig":"NFC"},
-          {"id":"e3","time":"08:30","pac":"Ana Torres","med":"Furosemida 40mg",  "res":"FUERA_HORARIO","orig":"NFC"},
-          {"id":"e4","time":"07:15","pac":"Ana Torres","med":"Enalapril 10mg",   "res":"CORRECTO",     "orig":"NFC"},
-          {"id":"e5","time":"08:00","pac":"Carlos Ruiz","med":"Metformina 500mg","res":"NO_TOMADO",    "orig":"Manual"}
-        ] %}
+        {% for ev in eventos %}
         <tr data-searchable>
           <td style="font-family:monospace;font-size:13px;font-weight:500;">{{ ev.time }}</td>
           <td style="font-size:13px;color:#2C3E50;font-weight:500;">{{ ev.pac }}</td>
           <td style="font-size:13px;color:#5D6D7E;">{{ ev.med }}</td>
           <td>
-            <span class="badge {% if ev.res=='CORRECTO' %}badge-green{% elif ev.res=='FUERA_HORARIO' %}badge-yellow{% else %}badge-red{% endif %}">
-              {{ ev.res }}
+            <span class="badge {% if ev.resultado=='Exitoso' %}badge-green{% elif ev.resultado=='Tardío' %}badge-yellow{% else %}badge-red{% endif %}">
+              {{ ev.resultado }}
             </span>
           </td>
           <td style="font-size:12px;color:#5D6D7E;">
@@ -59,19 +47,17 @@
           </td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="btn btn-ghost btn-icon btn-sm" title="Ver detalle"
-              onclick="verEvento('{{ ev.pac }}','{{ ev.med }}','{{ ev.res }}','{{ ev.time }}','{{ ev.orig }}')">
+              onclick="verEvento('{{ ev.pac|e }}','{{ ev.med|e }}','{{ ev.resultado|e }}','{{ ev.time }}','{{ ev.orig }}')">
               <i data-lucide="eye" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar observacion"
-              onclick="editEvento('{{ ev.id }}','{{ ev.pac }}','{{ ev.med }}')">
+              onclick="editEvento('{{ ev.id }}','{{ ev.pac|e }}','{{ ev.med|e }}')">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
-            </button>
-            <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
-              onclick="openConfirm('Eliminar registro de {{ ev.med }} ({{ ev.pac }})?','Se eliminara este evento NFC del historial.')">
-              <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
             </button>
           </td>
         </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:32px;">Sin eventos registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -143,35 +129,6 @@
   </div>
 </div>
 
-<!-- Modal confirmar eliminar -->
-<div id="modal-confirm" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-confirm')">
-  <div class="modal-box" style="max-width:420px;">
-    <div class="modal-header">
-      <span class="modal-title" style="color:#E74C3C;">Confirmar eliminacion</span>
-      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-confirm')">
-        <i data-lucide="x" style="width:16px;height:16px;"></i>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
-        </div>
-        <div>
-          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
-          <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;"></div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
-      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
-        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
-      </button>
-    </div>
-  </div>
-</div>
-
 {% endblock %}
 {% block scripts %}<script>
 lucide.createIcons();
@@ -187,10 +144,5 @@ function editEvento(id,pac,med){
   document.getElementById('edit-ev-info').textContent=pac+' — '+med;
   document.getElementById('edit-ev-obs').value='';
   openModal('modal-editar-ev'); lucide.createIcons();
-}
-function openConfirm(title,msg){
-  document.getElementById('confirm-title').textContent=title;
-  document.getElementById('confirm-msg').textContent=msg;
-  openModal('modal-confirm'); lucide.createIcons();
 }
 </script>{% endblock %}

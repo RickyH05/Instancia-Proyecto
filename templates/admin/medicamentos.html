@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-header">
   <div><h1>Medicamentos</h1><p>Catalogo de medicamentos del sistema</p></div>
-  <button class="btn btn-primary" onclick="openModal('modal-med')">
+  <button class="btn btn-primary" onclick="openModal('modal-med');setModoNuevo()">
     <i data-lucide="plus" style="width:16px;height:16px;"></i> Nuevo
   </button>
 </div>
@@ -14,47 +14,30 @@
     <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
     <input id="search-input" class="form-control" placeholder="Buscar por nombre o codigo ATC..."/>
   </div>
-  <div class="filter-pills" style="margin:0;">
-    <span class="pill active">Todos</span>
-    <span class="pill">Activos</span>
-    <span class="pill">Inactivos</span>
-  </div>
 </div>
 
 <div class="card">
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>Nombre Generico</th><th>Nombres Comerciales</th><th>ATC</th>
-        <th>Vias</th><th>Dosis Max.</th><th>Estado</th><th style="text-align:right;">Acciones</th>
+        <th>Nombre Generico</th><th>ATC</th><th>Dosis Max.</th><th>Unidad</th>
+        <th style="text-align:right;">Acciones</th>
       </tr></thead>
       <tbody>
-        {% for m in [
-          {"id":1,"g":"Metformina",      "c":"Glucophage, Dabex",   "atc":"A10BA02","vias":"Oral",       "max":"2000 mg","activo":true},
-          {"id":2,"g":"Losartan",        "c":"Cozaar, Losartan MK", "atc":"C09CA01","vias":"Oral",       "max":"100 mg", "activo":true},
-          {"id":3,"g":"Atorvastatina",   "c":"Lipitor, Caduet",     "atc":"C10AA05","vias":"Oral",       "max":"80 mg",  "activo":true},
-          {"id":4,"g":"Enalapril",       "c":"Vasotec, Renitec",    "atc":"C09AA02","vias":"Oral",       "max":"40 mg",  "activo":true},
-          {"id":5,"g":"Furosemida",      "c":"Lasix",               "atc":"C03CA01","vias":"Oral, IV",   "max":"600 mg", "activo":true},
-          {"id":6,"g":"Levotiroxina",    "c":"Synthroid, Eutirox",  "atc":"H03AA01","vias":"Oral",       "max":"300 mcg","activo":true},
-          {"id":7,"g":"Insulina Glargina","c":"Lantus, Toujeo",     "atc":"A10AE04","vias":"Subcutanea", "max":"80 UI",  "activo":false}
-        ] %}
+        {% for m in medicamentos %}
+        {# m: (0=id, 1=nombre_generico, 2=codigo_atc, 3=dosis_max, 4=unidad, 5=id_unidad) #}
         <tr data-searchable>
-          <td style="font-weight:500;">{{ m.g }}</td>
-          <td style="font-size:13px;color:#5D6D7E;">{{ m.c }}</td>
-          <td style="font-family:monospace;font-size:12px;">{{ m.atc }}</td>
-          <td style="font-size:13px;">{{ m.vias }}</td>
-          <td style="font-size:13px;">{{ m.max }}</td>
-          <td>
-            {% if m.activo %}<span class="badge badge-green">Activo</span>
-            {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
-          </td>
+          <td style="font-weight:500;">{{ m[1] }}</td>
+          <td style="font-family:monospace;font-size:12px;">{{ m[2] }}</td>
+          <td style="font-size:13px;">{{ m[3] }}</td>
+          <td style="font-size:13px;">{{ m[4] }}</td>
           <td style="text-align:right;">
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
-              onclick="openModal('modal-med')">
+              onclick="editMed({{ m[0] }},'{{ m[1]|e }}','{{ m[2]|e }}',{{ m[3] or 0 }},{{ m[5] or 0 }})">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
-              onclick="openConfirm('¿Eliminar {{ m.g }}?', 'Esta accion no se puede deshacer.')">
+              onclick="openConfirm({{ m[0] }},'Eliminar {{ m[1]|e }}?','Esta accion no se puede deshacer.')">
               <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
             </button>
           </td>
@@ -69,49 +52,44 @@
 <div id="modal-med" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-med')">
   <div class="modal-box">
     <div class="modal-header">
-      <span class="modal-title">Nuevo Medicamento</span>
+      <span class="modal-title" id="modal-med-title">Nuevo Medicamento</span>
       <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-med')">
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Nombre Generico *</label>
-        <input class="form-control" placeholder="Ej: Metformina"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Codigo ATC *</label>
-        <input class="form-control" style="font-family:monospace;" placeholder="Ej: A10BA02"/>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <form method="POST" action="{{ url_for('admin_medicamentos') }}">
+      <input type="hidden" id="med-acc" name="acc" value="I">
+      <input type="hidden" id="med-id" name="id_medicamento" value="">
+      <div class="modal-body">
         <div class="form-group">
-          <label class="form-label">Dosis Max. Diaria</label>
-          <input class="form-control" type="number" placeholder="2000"/>
+          <label class="form-label">Nombre Generico *</label>
+          <input class="form-control" id="med-nombre" name="nombre" placeholder="Ej: Metformina"/>
         </div>
         <div class="form-group">
-          <label class="form-label">Unidad</label>
-          <select class="form-control">
-            <option>mg</option><option>mcg</option><option>ml</option><option>UI</option>
-          </select>
+          <label class="form-label">Codigo ATC *</label>
+          <input class="form-control" id="med-atc" name="atc" style="font-family:monospace;" placeholder="Ej: A10BA02"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Dosis Max. Diaria</label>
+            <input class="form-control" id="med-dmax" name="dosis_max" type="number" placeholder="2000"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unidad</label>
+            <select class="form-control" id="med-unidad" name="id_unidad">
+              <option value="">— Seleccionar —</option>
+              {% for u in unidades %}
+              <option value="{{ u[0] }}">{{ u[1] }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Nombres Comerciales</label>
-        <input class="form-control" placeholder="Glucophage, Dabex... (separados por coma)"/>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-med')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
       </div>
-      <div class="form-group">
-        <label class="form-label">Vias de Administracion</label>
-        <input class="form-control" placeholder="Oral, Intravenosa..."/>
-      </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:12px;">
-        <label class="form-label" style="margin:0;">Activo</label>
-        <input type="checkbox" checked style="width:18px;height:18px;accent-color:#1B4F72;cursor:pointer;"/>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-med')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-med')">Guardar</button>
-    </div>
+    </form>
   </div>
 </div>
 
@@ -124,34 +102,55 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="width:44px;height:44px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i data-lucide="alert-triangle" style="width:22px;height:22px;color:#E74C3C;"></i>
-        </div>
-        <div>
-          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:4px;"></div>
-          <div id="confirm-msg" style="font-size:14px;color:#5D6D7E;"></div>
+    <form method="POST" action="{{ url_for('admin_medicamentos') }}">
+      <input type="hidden" name="acc" value="D">
+      <input type="hidden" id="del-id-med" name="id_medicamento" value="">
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="width:44px;height:44px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i data-lucide="alert-triangle" style="width:22px;height:22px;color:#E74C3C;"></i>
+          </div>
+          <div>
+            <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:4px;"></div>
+            <div id="confirm-msg" style="font-size:14px;color:#5D6D7E;"></div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
-      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
-        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
-      </button>
-    </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+        <button type="submit" class="btn btn-danger">
+          <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
 lucide.createIcons();
-function openConfirm(title, msg) {
-  document.getElementById('confirm-title').textContent = title;
-  document.getElementById('confirm-msg').textContent = msg;
-  openModal('modal-confirm');
-  lucide.createIcons();
+function setModoNuevo(){
+  document.getElementById('modal-med-title').textContent='Nuevo Medicamento';
+  document.getElementById('med-acc').value='I';
+  document.getElementById('med-id').value='';
+  ['med-nombre','med-atc','med-dmax'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('med-unidad').value='';
+}
+function editMed(id,nombre,atc,dmax,idUnidad){
+  document.getElementById('modal-med-title').textContent='Editar Medicamento';
+  document.getElementById('med-acc').value='U';
+  document.getElementById('med-id').value=id;
+  document.getElementById('med-nombre').value=nombre;
+  document.getElementById('med-atc').value=atc;
+  document.getElementById('med-dmax').value=dmax||'';
+  document.getElementById('med-unidad').value=idUnidad||'';
+  openModal('modal-med'); lucide.createIcons();
+}
+function openConfirm(id,title,msg){
+  document.getElementById('del-id-med').value=id;
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  openModal('modal-confirm'); lucide.createIcons();
 }
 </script>
 {% endblock %}

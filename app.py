@@ -10,7 +10,35 @@ from flask import Flask, flash, redirect, render_template, request, session, url
 load_dotenv()
 
 app = Flask(__name__)
+app.jinja_env.filters['enumerate'] = enumerate
 app.secret_key = os.environ["SECRET_KEY"]
+
+
+@app.context_processor
+def inject_alert_count():
+    if "user_id" not in session:
+        return {"alertas_badge": 0}
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        if session.get("rol") == "medico":
+            cur.execute(
+                "SELECT total_pendientes FROM v_alertas_pendientes_medico WHERE id_usuario = %s",
+                [session["user_id"]]
+            )
+        elif session.get("rol") == "cuidador":
+            cur.execute(
+                "SELECT total_pendientes FROM v_alertas_pendientes_cuidador WHERE id_usuario = %s",
+                [session["user_id"]]
+            )
+        else:
+            cur.close(); conn.close()
+            return {"alertas_badge": 0}
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return {"alertas_badge": row[0] if row else 0}
+    except Exception:
+        return {"alertas_badge": 0}
 
 # ─── Conexión a la base de datos ────────────────────────────────────────────
 
@@ -61,16 +89,47 @@ def login():
             flash("Por favor ingresa email y contraseña.", "danger")
             return render_template("login.html")
 
-        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        # ── Verificar admin especial (credenciales en .env, sin registro en BD) ──
+        admin_email = os.environ.get("ADMIN_EMAIL", "")
+        admin_hash  = os.environ.get("ADMIN_PASSWORD_HASH", "")
+        if email == admin_email and admin_hash and bcrypt.checkpw(password.encode(), admin_hash.encode()):
+            session["user_id"] = 0
+            session["rol"]     = "admin"
+            session["id_rol"]  = None
+            session["nombre"]  = "Administrador"
+            return redirect(url_for("dashboard"))
 
+        # ── Login normal contra tabla usuario ────────────────────────────────
         try:
             conn = get_db()
             cur  = conn.cursor()
-            cur.execute(
-                "CALL sp_login(%s, %s, NULL, NULL, NULL, NULL, NULL, %s)",
-                [email, password_hash, request.remote_addr],
-            )
-            p_ok, p_msg, p_id_usr, p_rol, p_id_rol = cur.fetchone()
+
+            cur.execute("""
+                SELECT u.id_usuario, u.password_hash, u.rol_usuario,
+                       COALESCE(u.id_medico, u.id_cuidador) AS id_rol,
+                       CASE u.rol_usuario
+                           WHEN 'medico'   THEN m.nombre || ' ' || m.apellido_p
+                           WHEN 'cuidador' THEN c.nombre || ' ' || c.apellido_p
+                           ELSE u.email
+                       END AS nombre
+                FROM usuario u
+                LEFT JOIN medico   m ON m.id_medico   = u.id_medico
+                LEFT JOIN cuidador c ON c.id_cuidador = u.id_cuidador
+                WHERE u.email = %s AND u.activo = TRUE
+            """, [email])
+            row = cur.fetchone()
+
+            login_ok = False
+            if row:
+                id_usuario, stored_hash, rol, id_rol, nombre = row
+                if bcrypt.checkpw(password.encode(), stored_hash.encode()):
+                    login_ok = True
+
+            if row:
+                cur.execute("""
+                    INSERT INTO log_acceso (id_usr, email, rol, ip, exitoso)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, [row[0], email, row[2], request.remote_addr, login_ok])
             conn.commit()
             cur.close()
             conn.close()
@@ -78,13 +137,14 @@ def login():
             flash("Error de conexión con la base de datos.", "danger")
             return render_template("login.html")
 
-        if p_ok == 1:
-            session["user_id"] = p_id_usr
-            session["rol"]     = p_rol
-            session["id_rol"]  = p_id_rol
+        if login_ok:
+            session["user_id"] = id_usuario
+            session["rol"]     = rol
+            session["id_rol"]  = id_rol
+            session["nombre"]  = nombre
             return redirect(url_for("dashboard"))
 
-        flash(p_msg, "danger")
+        flash("Credenciales incorrectas.", "danger")
 
     return render_template("login.html")
 
@@ -124,16 +184,58 @@ def _admin_db():
 @login_requerido
 @rol_requerido("admin")
 def admin_dashboard():
-    """Vista general: carga de médicos (v_carga_medicos)."""
+    """Vista general: carga de médicos + conteos reales para stat cards."""
     carga = []
+    total_medicos = total_cuidadores = total_pacientes = total_medicamentos = 0
+    total_gps = total_beacons = total_alertas = 0
+    actividad_reciente = []
     try:
         conn, cur = _admin_db()
         cur.execute("SELECT * FROM v_carga_medicos ORDER BY total_pac DESC")
         carga = cur.fetchall()
+
+        cur.execute("SELECT COUNT(*) FROM medico WHERE activo = TRUE")
+        total_medicos = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM cuidador")
+        total_cuidadores = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM paciente WHERE activo = TRUE")
+        total_pacientes = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM medicamento WHERE activo = TRUE")
+        total_medicamentos = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM gps_imei WHERE activo = TRUE")
+        total_gps = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM beacon WHERE activo = TRUE")
+        total_beacons = cur.fetchone()[0]
+
+        cur.execute("""
+            SELECT COUNT(*) FROM alerta a
+            JOIN estado_alerta ea ON ea.id_estado = a.id_estado
+            WHERE UPPER(ea.descripcion) = 'PENDIENTE'
+        """)
+        total_alertas = cur.fetchone()[0]
+
+        cur.execute("""
+            SELECT COALESCE(id_usr_app::text, usuario_db), accion, tabla, ts
+            FROM v_audit_cambios
+            ORDER BY ts DESC LIMIT 5
+        """)
+        actividad_reciente = cur.fetchall()
+
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar el dashboard: {e}", "danger")
-    return render_template("admin/dashboard.html", carga=carga)
+    return render_template("admin/dashboard.html",
+        carga=carga,
+        total_medicos=total_medicos, total_cuidadores=total_cuidadores,
+        total_pacientes=total_pacientes, total_medicamentos=total_medicamentos,
+        total_gps=total_gps, total_beacons=total_beacons, total_alertas=total_alertas,
+        actividad_reciente=actividad_reciente,
+    )
 
 
 # ═══════════════════════════════════════════════════════
@@ -182,11 +284,16 @@ def admin_medicos():
 
         return redirect(url_for("admin_medicos"))
 
-    # GET — listar médicos desde v_carga_medicos
+    # GET
     medicos = []
     try:
         conn, cur = _admin_db()
-        cur.execute("SELECT id_medico, medico, cedula_profesional, total_pac FROM v_carga_medicos ORDER BY medico")
+        cur.execute("""
+            SELECT id_medico, nombre, apellido_p, COALESCE(apellido_m,'') AS apellido_m,
+                   COALESCE(cedula_profesional,'') AS cedula,
+                   COALESCE(email,'') AS email, activo
+            FROM medico ORDER BY apellido_p, nombre
+        """)
         medicos = cur.fetchall()
         cur.close(); conn.close()
     except Exception as e:
@@ -241,16 +348,15 @@ def admin_cuidadores():
 
         return redirect(url_for("admin_cuidadores"))
 
-    # GET — SELECT directo: no existe view para listar cuidadores (excepción aceptada)
+    # GET
     cuidadores = []
     try:
         conn, cur = _admin_db()
         cur.execute("""
-            SELECT id_cuidador,
-                   nombre || ' ' || apellido_paterno || ' ' || COALESCE(apellido_materno,'') AS nombre_completo,
-                   tipo_cuidador, telefono, email, activo
-            FROM cuidador
-            ORDER BY apellido_paterno, nombre
+            SELECT id_cuidador, nombre, apellido_p, COALESCE(apellido_m,'') AS apellido_m,
+                   tipo_cuidador, COALESCE(telefono,'') AS telefono,
+                   COALESCE(email,'') AS email, activo
+            FROM cuidador ORDER BY apellido_p, nombre
         """)
         cuidadores = cur.fetchall()
         cur.close(); conn.close()
@@ -311,10 +417,10 @@ def admin_pacientes():
         conn, cur = _admin_db()
         cur.execute("""
             SELECT id_paciente,
-                   nombre || ' ' || apellido_paterno || ' ' || COALESCE(apellido_materno,'') AS nombre_completo,
+                   nombre || ' ' || apellido_p || ' ' || COALESCE(apellido_m,'') AS nombre_completo,
                    curp, fecha_nacimiento, activo
             FROM paciente
-            ORDER BY apellido_paterno, nombre
+            ORDER BY apellido_p, nombre
         """)
         pacientes = cur.fetchall()
         cur.close(); conn.close()
@@ -367,22 +473,25 @@ def admin_medicamentos():
 
         return redirect(url_for("admin_medicamentos"))
 
-    # GET — SELECT directo: no existe view para listar medicamentos (excepción aceptada)
+    # GET
     medicamentos = []
+    unidades = []
     try:
         conn, cur = _admin_db()
         cur.execute("""
             SELECT m.id_medicamento, m.nombre_generico, m.codigo_atc,
-                   m.dosis_maxima, u.descripcion AS unidad
+                   m.dosis_max, u.descripcion AS unidad, m.id_unidad
             FROM medicamento m
             LEFT JOIN unidad_dosis u ON u.id_unidad = m.id_unidad
             ORDER BY m.nombre_generico
         """)
         medicamentos = cur.fetchall()
+        cur.execute("SELECT id_unidad, descripcion FROM unidad_dosis ORDER BY descripcion")
+        unidades = cur.fetchall()
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar medicamentos: {e}", "danger")
-    return render_template("admin/medicamentos.html", medicamentos=medicamentos)
+    return render_template("admin/medicamentos.html", medicamentos=medicamentos, unidades=unidades)
 
 
 # ═══════════════════════════════════════════════════════
@@ -529,8 +638,9 @@ def admin_beacon():
 
         return redirect(url_for("admin_beacon"))
 
-    # GET — listar solo beacons desde v_dispositivos_iot
+    # GET
     beacons = []
+    pacientes = []
     try:
         conn, cur = _admin_db()
         cur.execute("""
@@ -540,10 +650,16 @@ def admin_beacon():
             ORDER BY activo DESC, nombre
         """)
         beacons = cur.fetchall()
+        cur.execute("""
+            SELECT id_paciente,
+                   nombre || ' ' || apellido_p || ' ' || COALESCE(apellido_m,'') AS nombre_completo
+            FROM paciente WHERE activo = TRUE ORDER BY apellido_p, nombre
+        """)
+        pacientes = cur.fetchall()
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar beacons: {e}", "danger")
-    return render_template("admin/beacons.html", beacons=beacons)
+    return render_template("admin/beacons.html", beacons=beacons, pacientes=pacientes)
 
 
 # ═══════════════════════════════════════════════════════
@@ -589,8 +705,9 @@ def admin_gps():
 
         return redirect(url_for("admin_gps"))
 
-    # GET — listar solo GPS desde v_dispositivos_iot
+    # GET
     gps_lista = []
+    cuidadores = []
     try:
         conn, cur = _admin_db()
         cur.execute("""
@@ -600,10 +717,16 @@ def admin_gps():
             ORDER BY activo DESC, ident
         """)
         gps_lista = cur.fetchall()
+        cur.execute("""
+            SELECT id_cuidador,
+                   nombre || ' ' || apellido_p || ' ' || COALESCE(apellido_m,'') AS nombre_completo
+            FROM cuidador ORDER BY apellido_p, nombre
+        """)
+        cuidadores = cur.fetchall()
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar GPS: {e}", "danger")
-    return render_template("admin/gps_dispositivos.html", gps_lista=gps_lista)
+    return render_template("admin/gps_dispositivos.html", gps_lista=gps_lista, cuidadores=cuidadores)
 
 
 # ═══════════════════════════════════════════════════════
@@ -1238,23 +1361,26 @@ def doctor_paciente_perfil(id):
         if paciente and total:
             paciente["pct"] = round(ok_count / total * 100)
 
-        # ── v_alertas_medico — filtradas por id_evento del paciente ──────────
+        # ── alertas directas por id_paciente ────────────────────────────────
         cur.execute("""
-            SELECT id_alerta, prioridad, tipo, estado, timestamp_gen,
-                   paciente, medicamento, id_evento
-            FROM v_alertas_medico
-            WHERE id_medico = %s
-            ORDER BY timestamp_gen DESC
-        """, [id_medico])
-        rows = cur.fetchall()
-        ids_eventos_pac = {h["id_evento"] for h in historial}
-        for r in rows:
-            id_al, prio, tipo, estado, ts_gen, pac_nom, med, id_ev = r
-            if id_ev in ids_eventos_pac or pac_nom == paciente.get("nombre"):
-                alertas.append({
-                    "id": id_al, "prioridad": prio, "tipo": tipo,
-                    "estado": estado, "timestamp": ts_gen, "medicamento": med,
-                })
+            SELECT a.id_alerta, a.prioridad, ta.descripcion AS tipo,
+                   ea.descripcion AS estado, a.timestamp_gen,
+                   med.nombre_generico AS medicamento
+            FROM alerta a
+            JOIN tipo_alerta   ta  ON ta.id_tipo_alerta = a.id_tipo_alerta
+            JOIN estado_alerta ea  ON ea.id_estado      = a.id_estado
+            JOIN receta_medicamento rm ON rm.id_receta_medicamento = a.id_receta_medicamento
+            JOIN receta r2            ON r2.id_receta    = rm.id_receta
+            JOIN medicamento med      ON med.id_medicamento = rm.id_medicamento
+            WHERE r2.id_paciente = %s
+            ORDER BY a.timestamp_gen DESC
+        """, [id])
+        for r in cur.fetchall():
+            id_al, prio, tipo, estado, ts_gen, med = r
+            alertas.append({
+                "id": id_al, "prioridad": prio, "tipo": tipo,
+                "estado": estado, "timestamp": ts_gen, "medicamento": med,
+            })
 
         # ── v_recetas_paciente ───────────────────────────────────────────────
         # Cols: id_receta, estado_receta, fecha_emision, fecha_inicio, fecha_fin,
@@ -1608,7 +1734,60 @@ def doctor_asignar_cuidador(id):
 @login_requerido
 @rol_requerido("medico")
 def doctor_recetas():
-    return render_template("doctor/recetas.html")
+    id_medico  = session["id_rol"]
+    recetas    = {}
+    pacientes  = []
+    medicamentos = []
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("""
+            SELECT vr.id_receta,
+                   p.nombre || ' ' || p.apellido_p || ' ' || COALESCE(p.apellido_m,'') AS pac_nombre,
+                   vr.estado_receta, vr.fecha_inicio, vr.fecha_fin,
+                   vr.nombre_generico, vr.dosis_prescrita, vr.unidad,
+                   vr.frecuencia_horas, vr.hora_primera_toma
+            FROM v_recetas_paciente vr
+            JOIN receta   r ON r.id_receta   = vr.id_receta
+            JOIN paciente p ON p.id_paciente = vr.id_paciente
+            WHERE r.id_medico = %s
+            ORDER BY vr.fecha_emision DESC, vr.id_receta, vr.nombre_generico
+        """, [id_medico])
+        for row in cur.fetchall():
+            id_rx, pac, estado, f_ini, f_fin, med_nom, dosis, unidad, freq, hora = row
+            if id_rx not in recetas:
+                recetas[id_rx] = {
+                    "id": id_rx, "pac_nombre": (pac or "").strip(),
+                    "estado": estado,
+                    "ini": str(f_ini), "fin": str(f_fin),
+                    "meds": [],
+                }
+            if med_nom:
+                label = f"{med_nom} {dosis}{unidad}" if dosis and unidad else med_nom
+                recetas[id_rx]["meds"].append({
+                    "nombre": label,
+                    "freq":   f"{freq}h" if freq else "—",
+                    "hora":   str(hora)[:5] if hora else "—",
+                })
+
+        cur.execute("""
+            SELECT id_paciente,
+                   nombre || ' ' || apellido_p || ' ' || COALESCE(apellido_m,'') AS nombre
+            FROM paciente WHERE activo = TRUE ORDER BY apellido_p, nombre
+        """)
+        pacientes = cur.fetchall()
+
+        cur.execute("SELECT id_medicamento, nombre_generico FROM medicamento ORDER BY nombre_generico")
+        medicamentos = cur.fetchall()
+
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar recetas: {e}", "danger")
+    return render_template("doctor/recetas.html",
+        recetas=list(recetas.values()),
+        pacientes=pacientes,
+        medicamentos=medicamentos,
+    )
 
 
 @app.route("/doctor/reportes")
@@ -1636,7 +1815,43 @@ def doctor_proximidad_mapa():
 @login_requerido
 @rol_requerido("medico")
 def doctor_proximidad_historial():
-    return render_template("proximidad/historial.html")
+    id_medico = session["id_rol"]
+    eventos   = []
+    total = validos = sin_prox = 0
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("""
+            SELECT p.nombre || ' ' || p.apellido_p AS paciente,
+                   vht.medicamento, vht.cuidador, vht.timestamp_lectura,
+                   vht.distancia_metros, vht.proximidad_valida
+            FROM v_historial_tomas vht
+            JOIN paciente p ON p.id_paciente = vht.id_paciente
+            WHERE vht.id_paciente IN (
+                SELECT DISTINCT r.id_paciente FROM receta r WHERE r.id_medico = %s
+            )
+            ORDER BY vht.timestamp_lectura DESC
+            LIMIT 100
+        """, [id_medico])
+        for r in cur.fetchall():
+            pac, med, cuid, ts, dist, valida = r
+            eventos.append({
+                "pac":   pac,
+                "med":   med or "—",
+                "cuid":  cuid or "—",
+                "ts":    str(ts)[:16],
+                "dist":  f"{dist:.1f}m" if dist is not None else "—",
+                "valida": bool(valida),
+            })
+        total    = len(eventos)
+        validos  = sum(1 for e in eventos if e["valida"])
+        sin_prox = total - validos
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar historial de proximidad: {e}", "danger")
+    return render_template("proximidad/historial.html",
+        eventos=eventos, total=total, validos=validos, sin_prox=sin_prox
+    )
 
 # ═══════════════════════════════════════════════════════
 # CUIDADOR
@@ -1938,21 +2153,134 @@ def cuidador_alerta_atender(id_alerta):
 @login_requerido
 @rol_requerido("cuidador")
 def cuidador_historial():
-    return render_template("cuidador/historial_nfc.html")
+    id_cuidador = session["id_rol"]
+    eventos = []
+    stats   = {"ok": 0, "omitidas": 0, "fuera": 0}
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("""
+            SELECT p.nombre || ' ' || p.apellido_p AS paciente,
+                   vht.id_evento, vht.timestamp_lectura, vht.medicamento,
+                   vht.resultado, vht.origen
+            FROM v_historial_tomas vht
+            JOIN paciente p ON p.id_paciente = vht.id_paciente
+            WHERE vht.id_paciente IN (
+                SELECT id_paciente FROM paciente_cuidador
+                WHERE id_cuidador = %s AND activo = TRUE
+            )
+            ORDER BY vht.timestamp_lectura DESC
+            LIMIT 50
+        """, [id_cuidador])
+        for r in cur.fetchall():
+            pac, id_ev, ts, med, resultado, origen = r
+            eventos.append({
+                "id":        id_ev,
+                "pac":       pac,
+                "med":       med or "—",
+                "resultado": resultado or "—",
+                "time":      str(ts)[:16],
+                "orig":      "NFC" if (origen or "").lower() == "nfc" else "Manual",
+            })
+        stats["ok"]    = sum(1 for e in eventos if e["resultado"] == "Exitoso")
+        stats["fuera"] = sum(1 for e in eventos if e["resultado"] == "Tardío")
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar historial: {e}", "danger")
+    return render_template("cuidador/historial_nfc.html", eventos=eventos, stats=stats)
 
 
 @app.route("/cuidador/paciente/<int:id>/beacon")
 @login_requerido
 @rol_requerido("cuidador")
 def cuidador_beacon(id):
-    return render_template("cuidador/patient_beacon_detail.html", id=id)
+    paciente = {"nombre": "", "iniciales": "??"}
+    historial = []
+    stats     = {"total": 0, "con_presencia": 0, "sin_presencia": 0}
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+
+        cur.execute("""
+            SELECT nombre, apellido_p, COALESCE(apellido_m,'')
+            FROM paciente WHERE id_paciente = %s
+        """, [id])
+        row = cur.fetchone()
+        if row:
+            nom, ap, am = row
+            paciente = {
+                "nombre":    f"{nom} {ap} {am}".strip(),
+                "iniciales": (nom[0] + ap[0]).upper(),
+            }
+
+        cur.execute("""
+            SELECT timestamp_lectura, medicamento, proximidad_valida, distancia_metros
+            FROM v_historial_tomas
+            WHERE id_paciente = %s
+            ORDER BY timestamp_lectura DESC
+            LIMIT 20
+        """, [id])
+        for r in cur.fetchall():
+            ts, med, valida, dist = r
+            historial.append({
+                "ts":    str(ts)[11:16],
+                "med":   med or "—",
+                "valid": bool(valida),
+                "dist":  f"{dist:.1f}" if dist is not None else None,
+            })
+        stats["total"]         = len(historial)
+        stats["con_presencia"] = sum(1 for h in historial if h["valid"])
+        stats["sin_presencia"] = stats["total"] - stats["con_presencia"]
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar detalle de beacon: {e}", "danger")
+    return render_template("cuidador/patient_beacon_detail.html",
+        id=id, paciente=paciente, historial=historial, stats=stats
+    )
 
 
 @app.route("/cuidador/mi-gps")
 @login_requerido
 @rol_requerido("cuidador")
 def cuidador_mi_gps():
-    return render_template("cuidador/mi_gps.html")
+    id_cuidador     = session["id_rol"]
+    gps             = None
+    ultima_ubicacion = None
+    posiciones      = []
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("""
+            SELECT id_gps, imei, modelo, activo
+            FROM gps_imei
+            WHERE id_cuidador = %s
+            ORDER BY activo DESC LIMIT 1
+        """, [id_cuidador])
+        row = cur.fetchone()
+        if row:
+            id_gps, imei, modelo, activo = row
+            gps = {"id": id_gps, "imei": imei, "modelo": modelo, "activo": activo}
+            cur.execute("""
+                SELECT lat, lon, timestamp_gps
+                FROM ubicacion_gps
+                WHERE id_gps = %s
+                ORDER BY timestamp_gps DESC LIMIT 5
+            """, [id_gps])
+            rows = cur.fetchall()
+            for lat, lon, ts in rows:
+                posiciones.append({"lat": lat, "lon": lon, "ts": str(ts)[11:16]})
+            if posiciones:
+                p0 = posiciones[0]
+                ultima_ubicacion = {
+                    "lat": p0["lat"], "lon": p0["lon"],
+                    "ts": str(rows[0][2])[:16],
+                }
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar GPS: {e}", "danger")
+    return render_template("cuidador/mi_gps.html",
+        gps=gps, ultima_ubicacion=ultima_ubicacion, posiciones=posiciones
+    )
 
 # ═══════════════════════════════════════════════════════
 if __name__ == "__main__":

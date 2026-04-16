@@ -15,62 +15,35 @@
     <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
     <input id="search-input" class="form-control" placeholder="Buscar por IMEI, modelo o cuidador..."/>
   </div>
-  <div class="filter-pills" style="margin:0;">
-    <span class="pill active">Todos</span>
-    <span class="pill">Activos</span>
-    <span class="pill">Sin asignar</span>
-    <span class="pill">Inactivos</span>
-  </div>
 </div>
 
 <div class="card">
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>IMEI</th><th>Modelo</th><th>Cuidador asignado</th>
-        <th>Ultima ubicacion</th><th>Estado</th><th style="text-align:right;">Acciones</th>
+        <th>IMEI</th><th>Nombre / Modelo</th><th>Cuidador asignado</th>
+        <th>Estado</th><th style="text-align:right;">Acciones</th>
       </tr></thead>
       <tbody>
-        {% for d in [
-          {"id":"gps1","imei":"356938035643809","modelo":"Queclink GL300",
-           "cuid":"Maria Gomez Flores",     "upd":"2026-03-24 09:15","status":"active"},
-          {"id":"gps2","imei":"356938035644501","modelo":"Teltonika FMB920",
-           "cuid":"Roberto Hernandez Diaz", "upd":"2026-03-24 09:10","status":"active"},
-          {"id":"gps3","imei":"356938035645102","modelo":"Queclink GL300",
-           "cuid":"Lucia Fernandez Rios",   "upd":"2026-03-24 08:55","status":"active"},
-          {"id":"gps4","imei":"356938035645903","modelo":"Concox GT06N",
-           "cuid":"",                       "upd":"","status":"unassigned"},
-          {"id":"gps5","imei":"356938035646704","modelo":"Teltonika FMB920",
-           "cuid":"",                       "upd":"2026-03-20 14:30","status":"inactive"}
-        ] %}
+        {% for d in gps_lista %}
+        {# d: (0=id_disp, 1=ident/imei, 2=nombre/modelo, 3=asignado, 4=activo) #}
         <tr data-searchable>
-          <td style="font-family:monospace;font-size:12px;font-weight:500;">{{ d.imei }}</td>
-          <td style="font-size:14px;">{{ d.modelo }}</td>
-          <td style="font-size:13px;color:{% if d.cuid %}#2C3E50{% else %}#9CA3AF{% endif %};">
-            {{ d.cuid if d.cuid else '— Sin asignar —' }}
+          <td style="font-family:monospace;font-size:12px;font-weight:500;">{{ d[1] }}</td>
+          <td style="font-size:14px;">{{ d[2] }}</td>
+          <td style="font-size:13px;color:{% if d[3] %}#2C3E50{% else %}#9CA3AF{% endif %};">
+            {{ d[3] if d[3] else '— Sin asignar —' }}
           </td>
           <td>
-            {% if d.upd %}
-              <div style="display:flex;align-items:center;gap:5px;">
-                <i data-lucide="map-pin" style="width:12px;height:12px;color:#1ABC9C;"></i>
-                <span style="font-size:12px;color:#5D6D7E;">{{ d.upd }}</span>
-              </div>
-            {% else %}
-              <span style="font-size:12px;color:#9CA3AF;font-style:italic;">Sin registro</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if d.status=='active' %}<span class="badge badge-green">Activo</span>
-            {% elif d.status=='unassigned' %}<span class="badge badge-yellow">Sin asignar</span>
+            {% if d[4] %}<span class="badge badge-green">Activo</span>
             {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
           </td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
-              onclick="editGPS('{{ d.id }}','{{ d.imei }}','{{ d.modelo }}','{{ d.cuid }}')">
+              onclick="editGPS({{ d[0] }},'{{ d[1]|e }}','{{ d[2]|e }}')">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
-              onclick="openConfirm('Eliminar dispositivo IMEI {{ d.imei }}?','Se eliminara el dispositivo y su historial de ubicaciones.')">
+              onclick="openConfirm({{ d[0] }},'Eliminar dispositivo IMEI {{ d[1]|e }}?','Se eliminara el dispositivo y su historial de ubicaciones.')">
               <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
             </button>
           </td>
@@ -90,38 +63,36 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">IMEI *</label>
-        <input class="form-control" id="g-imei" style="font-family:monospace;" placeholder="356938035640000"/>
-        <small style="color:#5D6D7E;font-size:12px;">15 digitos del dispositivo GPS</small>
+    <form method="POST" action="{{ url_for('admin_gps') }}">
+      <input type="hidden" id="g-acc" name="acc" value="I">
+      <input type="hidden" id="g-id" name="id_gps" value="">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">IMEI *</label>
+          <input class="form-control" id="g-imei" name="imei" style="font-family:monospace;" placeholder="356938035640000"/>
+          <small style="color:#5D6D7E;font-size:12px;">15 digitos del dispositivo GPS</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Modelo *</label>
+          <input class="form-control" id="g-modelo" name="modelo" placeholder="Ej: Queclink GL300"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Asignar a Cuidador</label>
+          <select class="form-control" id="g-cuid" name="id_cuidador">
+            <option value="">— Sin asignar —</option>
+            {% for c in cuidadores %}
+            <option value="{{ c[0] }}">{{ c[1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Modelo *</label>
-        <select class="form-control" id="g-modelo">
-          <option>Queclink GL300</option>
-          <option>Teltonika FMB920</option>
-          <option>Concox GT06N</option>
-          <option>Coban GPS103</option>
-        </select>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-gps')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+        </button>
       </div>
-      <div class="form-group">
-        <label class="form-label">Asignar a Cuidador</label>
-        <select class="form-control" id="g-cuid">
-          <option value="">— Sin asignar —</option>
-          <option>Maria Gomez Flores</option>
-          <option>Roberto Hernandez Diaz</option>
-          <option>Lucia Fernandez Rios</option>
-          <option>Pedro Salazar Mora</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-gps')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-gps')">
-        <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
-      </button>
-    </div>
+    </form>
   </div>
 </div>
 
@@ -134,23 +105,27 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
-        </div>
-        <div>
-          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
-          <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+    <form method="POST" action="{{ url_for('admin_gps') }}">
+      <input type="hidden" name="acc" value="D">
+      <input type="hidden" id="del-id-gps" name="id_gps" value="">
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+          </div>
+          <div>
+            <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
+            <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
-      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
-        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
-      </button>
-    </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+        <button type="submit" class="btn btn-danger">
+          <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -159,17 +134,22 @@
 lucide.createIcons();
 function setModoNuevo(){
   document.getElementById('modal-gps-title').textContent='Registrar Dispositivo GPS';
+  document.getElementById('g-acc').value='I';
+  document.getElementById('g-id').value='';
   document.getElementById('g-imei').value='';
+  document.getElementById('g-modelo').value='';
   document.getElementById('g-cuid').value='';
 }
-function editGPS(id,imei,modelo,cuid){
+function editGPS(id,imei,modelo){
   document.getElementById('modal-gps-title').textContent='Editar Dispositivo GPS';
+  document.getElementById('g-acc').value='U';
+  document.getElementById('g-id').value=id;
   document.getElementById('g-imei').value=imei;
   document.getElementById('g-modelo').value=modelo;
-  document.getElementById('g-cuid').value=cuid;
   openModal('modal-gps'); lucide.createIcons();
 }
-function openConfirm(title,msg){
+function openConfirm(id,title,msg){
+  document.getElementById('del-id-gps').value=id;
   document.getElementById('confirm-title').textContent=title;
   document.getElementById('confirm-msg').textContent=msg;
   openModal('modal-confirm'); lucide.createIcons();

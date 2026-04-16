@@ -15,13 +15,6 @@
     <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
     <input id="search-input" class="form-control" placeholder="Buscar por nombre o correo..."/>
   </div>
-  <div class="filter-pills" style="margin:0;">
-    <span class="pill active">Todos</span>
-    <span class="pill">Formales</span>
-    <span class="pill">Informales</span>
-    <span class="pill">Activos</span>
-    <span class="pill">Inactivos</span>
-  </div>
 </div>
 
 <div class="card">
@@ -29,38 +22,29 @@
     <table>
       <thead><tr>
         <th>Nombre</th><th>Tipo</th><th>Telefono</th><th>Correo</th>
-        <th>Pacientes</th><th>Estado</th><th style="text-align:right;">Acciones</th>
+        <th>Estado</th><th style="text-align:right;">Acciones</th>
       </tr></thead>
       <tbody>
-        {% for c in [
-          {"id":1,"nombre":"Maria","apP":"Gomez","apM":"Flores",
-           "tipo":"Formal","tel":"+52 55 1234 5678","email":"m.gomez [at] medinfc.com","pac":2,"activo":true},
-          {"id":2,"nombre":"Roberto","apP":"Hernandez","apM":"Diaz",
-           "tipo":"Informal","tel":"+52 55 9876 5432","email":"r.hernandez [at] mail.com","pac":1,"activo":true},
-          {"id":3,"nombre":"Lucia","apP":"Fernandez","apM":"Rios",
-           "tipo":"Formal","tel":"+52 55 5555 1234","email":"l.fernandez [at] medinfc.com","pac":1,"activo":true},
-          {"id":4,"nombre":"Pedro","apP":"Salazar","apM":"Mora",
-           "tipo":"Informal","tel":"+52 55 6666 7777","email":"p.salazar [at] mail.com","pac":0,"activo":false}
-        ] %}
+        {% for c in cuidadores %}
+        {# c: (0=id, 1=nombre, 2=apellido_p, 3=apellido_m, 4=tipo, 5=telefono, 6=email, 7=activo) #}
         <tr data-searchable>
-          <td style="font-weight:500;">{{ c.nombre }} {{ c.apP }} {{ c.apM }}</td>
+          <td style="font-weight:500;">{{ c[1] }} {{ c[2] }} {{ c[3] }}</td>
           <td>
-            <span class="badge {% if c.tipo=='Formal' %}badge-blue{% else %}badge-gray{% endif %}">{{ c.tipo }}</span>
+            <span class="badge {% if c[4]=='formal' %}badge-blue{% else %}badge-gray{% endif %}">{{ c[4]|capitalize }}</span>
           </td>
-          <td style="font-size:13px;color:#5D6D7E;">{{ c.tel }}</td>
-          <td style="font-size:13px;color:#5D6D7E;">{{ c.email }}</td>
-          <td style="text-align:center;font-size:13px;">{{ c.pac }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ c[5] }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ c[6] }}</td>
           <td>
-            {% if c.activo %}<span class="badge badge-green">Activo</span>
+            {% if c[7] %}<span class="badge badge-green">Activo</span>
             {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
           </td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
-              onclick="editCuid({{ c.id }},'{{ c.nombre }}','{{ c.apP }}','{{ c.apM }}','{{ c.tipo }}','{{ c.tel }}',{{ 'true' if c.activo else 'false' }})">
+              onclick="editCuid({{ c[0] }},'{{ c[1]|e }}','{{ c[2]|e }}','{{ c[3]|e }}','{{ c[4] }}','{{ c[5]|e }}','{{ c[6]|e }}')">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
-              onclick="openConfirm('Eliminar a {{ c.nombre }} {{ c.apP }}?','Se eliminara el cuidador y todas sus asignaciones del sistema.')">
+              onclick="openConfirm({{ c[0] }},'Eliminar a {{ c[1]|e }} {{ c[2]|e }}?','Se desactivara el cuidador del sistema.')">
               <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
             </button>
           </td>
@@ -80,49 +64,49 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-        <div class="form-group">
-          <label class="form-label">Nombre *</label>
-          <input class="form-control" id="c-nombre"/>
+    <form method="POST" action="{{ url_for('admin_cuidadores') }}">
+      <input type="hidden" id="c-acc" name="acc" value="I">
+      <input type="hidden" id="c-id" name="id_cuidador" value="">
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Nombre *</label>
+            <input class="form-control" id="c-nombre" name="nombre"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ap. Paterno *</label>
+            <input class="form-control" id="c-apP" name="apellido_p"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ap. Materno</label>
+            <input class="form-control" id="c-apM" name="apellido_m"/>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select class="form-control" id="c-tipo" name="tipo">
+              <option value="formal">Formal</option>
+              <option value="informal">Informal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Telefono</label>
+            <input class="form-control" id="c-tel" name="telefono" placeholder="+52 55 0000 0000"/>
+          </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Ap. Paterno *</label>
-          <input class="form-control" id="c-apP"/>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Ap. Materno</label>
-          <input class="form-control" id="c-apM"/>
+          <label class="form-label">Correo electronico *</label>
+          <input class="form-control" id="c-email" name="email" type="text" placeholder="correo@dominio.com"/>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group">
-          <label class="form-label">Tipo</label>
-          <select class="form-control" id="c-tipo">
-            <option value="Formal">Formal</option>
-            <option value="Informal">Informal</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Telefono</label>
-          <input class="form-control" id="c-tel" placeholder="+52 55 0000 0000"/>
-        </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-cuid')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+        </button>
       </div>
-      <div class="form-group">
-        <label class="form-label">Correo electronico *</label>
-        <input class="form-control" id="c-email" type="text" placeholder="correo [at] dominio.com"/>
-      </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:12px;">
-        <label class="form-label" style="margin:0;">Activo</label>
-        <input type="checkbox" id="c-activo" checked style="width:18px;height:18px;accent-color:#1B4F72;cursor:pointer;"/>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-cuid')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-cuid')">
-        <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
-      </button>
-    </div>
+    </form>
   </div>
 </div>
 
@@ -135,23 +119,27 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
-        </div>
-        <div>
-          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
-          <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+    <form method="POST" action="{{ url_for('admin_cuidadores') }}">
+      <input type="hidden" name="acc" value="D">
+      <input type="hidden" id="del-id-cuid" name="id_cuidador" value="">
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+          </div>
+          <div>
+            <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
+            <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
-      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
-        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
-      </button>
-    </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+        <button type="submit" class="btn btn-danger">
+          <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -160,21 +148,25 @@
 lucide.createIcons();
 function setModoNuevo(){
   document.getElementById('modal-cuid-title').textContent='Nuevo Cuidador';
+  document.getElementById('c-acc').value='I';
+  document.getElementById('c-id').value='';
   ['c-nombre','c-apP','c-apM','c-tel','c-email'].forEach(function(id){document.getElementById(id).value='';});
-  document.getElementById('c-tipo').value='Formal';
-  document.getElementById('c-activo').checked=true;
+  document.getElementById('c-tipo').value='formal';
 }
-function editCuid(id,nombre,apP,apM,tipo,tel,activo){
+function editCuid(id,nombre,apP,apM,tipo,tel,email){
   document.getElementById('modal-cuid-title').textContent='Editar Cuidador';
+  document.getElementById('c-acc').value='U';
+  document.getElementById('c-id').value=id;
   document.getElementById('c-nombre').value=nombre;
   document.getElementById('c-apP').value=apP;
   document.getElementById('c-apM').value=apM;
   document.getElementById('c-tipo').value=tipo;
   document.getElementById('c-tel').value=tel;
-  document.getElementById('c-activo').checked=activo;
+  document.getElementById('c-email').value=email;
   openModal('modal-cuid'); lucide.createIcons();
 }
-function openConfirm(title,msg){
+function openConfirm(id,title,msg){
+  document.getElementById('del-id-cuid').value=id;
   document.getElementById('confirm-title').textContent=title;
   document.getElementById('confirm-msg').textContent=msg;
   openModal('modal-confirm'); lucide.createIcons();

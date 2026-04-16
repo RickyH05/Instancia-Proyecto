@@ -12,12 +12,6 @@
     <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
     <input id="search-input" class="form-control" placeholder="Buscar paciente, medicamento, cuidador..."/>
   </div>
-  <select class="form-control" style="max-width:200px;">
-    <option>Todos los pacientes</option>
-    <option>Juan López</option>
-    <option>Ana Torres</option>
-    <option>Carlos Ruiz</option>
-  </select>
   <div class="filter-pills" style="margin:0;">
     <span class="pill active">Todos</span>
     <span class="pill">Válidos</span>
@@ -30,9 +24,9 @@
 
 <!-- Resumen -->
 <div class="stats-grid stats-grid-3" style="margin-bottom:20px;">
-  <div class="stat-card" style="padding:14px;"><div><div class="stat-label">Total eventos</div><div class="stat-value" style="color:#1B4F72;font-size:28px;">8</div></div></div>
-  <div class="stat-card" style="padding:14px;"><div><div class="stat-label">Presencia válida</div><div class="stat-value" style="color:#1ABC9C;font-size:28px;">5</div></div></div>
-  <div class="stat-card" style="padding:14px;"><div><div class="stat-label">Sin proximidad</div><div class="stat-value" style="color:#E74C3C;font-size:28px;">3</div></div></div>
+  <div class="stat-card" style="padding:14px;"><div><div class="stat-label">Total eventos</div><div class="stat-value" style="color:#1B4F72;font-size:28px;">{{ total }}</div></div></div>
+  <div class="stat-card" style="padding:14px;"><div><div class="stat-label">Presencia válida</div><div class="stat-value" style="color:#1ABC9C;font-size:28px;">{{ validos }}</div></div></div>
+  <div class="stat-card" style="padding:14px;"><div><div class="stat-label">Sin proximidad</div><div class="stat-value" style="color:#E74C3C;font-size:28px;">{{ sin_prox }}</div></div></div>
 </div>
 
 <!-- Tabla -->
@@ -42,29 +36,19 @@
       <thead>
         <tr>
           <th>Paciente</th><th>Medicamento</th><th>Cuidador</th>
-          <th>Fecha/Hora</th><th>Beacon Detectado</th><th>Distancia</th><th>Estado GPS/Beacon</th>
+          <th>Fecha/Hora</th><th>Distancia</th><th>Estado GPS/Beacon</th>
         </tr>
       </thead>
       <tbody>
-        {% for ev in [
-          {"pac":"Juan López","med":"Metformina 500mg","cuid":"María Gómez","ts":"2026-03-24 08:05","beacon":"Beacon Sala - López","dist":"2.3m","ok":true},
-          {"pac":"Juan López","med":"Losartán 50mg",   "cuid":"María Gómez","ts":"2026-03-24 08:06","beacon":"Beacon Sala - López","dist":"2.5m","ok":true},
-          {"pac":"Ana Torres","med":"Enalapril 10mg",  "cuid":"María Gómez","ts":"2026-03-24 07:15","beacon":"Beacon Cocina - Torres","dist":"3.1m","ok":true},
-          {"pac":"Ana Torres","med":"Furosemida 40mg", "cuid":"María Gómez","ts":"2026-03-24 08:30","beacon":"Beacon Cocina - Torres","dist":"12.8m","ok":false},
-          {"pac":"Carlos Ruiz","med":"Metformina 500mg","cuid":"Roberto Hernández","ts":"2026-03-23 08:00","beacon":"Beacon Sala - Ruiz","dist":"1.5m","ok":true},
-          {"pac":"Juan López","med":"Atorvastatina 20mg","cuid":"María Gómez","ts":"2026-03-23 21:00","beacon":"Beacon Recámara","dist":"18.4m","ok":false},
-          {"pac":"Carlos Ruiz","med":"Losartán 50mg",  "cuid":"Roberto Hernández","ts":"2026-03-23 08:10","beacon":"Beacon Sala - Ruiz","dist":"4.8m","ok":true},
-          {"pac":"Juan López","med":"Metformina 500mg","cuid":"María Gómez","ts":"2026-03-22 08:05","beacon":"—","dist":"—","ok":false}
-        ] %}
+        {% for ev in eventos %}
         <tr data-searchable>
           <td style="font-weight:500;">{{ ev.pac }}</td>
           <td style="font-size:13px;color:#5D6D7E;">{{ ev.med }}</td>
           <td style="font-size:13px;color:#5D6D7E;">{{ ev.cuid }}</td>
           <td style="font-size:13px;color:#5D6D7E;">{{ ev.ts }}</td>
-          <td style="font-size:13px;">{{ ev.beacon }}</td>
           <td style="font-family:monospace;font-size:13px;">{{ ev.dist }}</td>
           <td>
-            {% if ev.ok %}
+            {% if ev.valida %}
             <span class="badge badge-green">Válido</span>
             {% elif ev.dist == '—' %}
             <span class="badge badge-yellow">Sin beacon</span>
@@ -73,6 +57,8 @@
             {% endif %}
           </td>
         </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:32px;">Sin eventos registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>

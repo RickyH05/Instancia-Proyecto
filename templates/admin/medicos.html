@@ -15,51 +15,33 @@
     <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
     <input id="search-input" class="form-control" placeholder="Buscar por nombre o cedula..."/>
   </div>
-  <div class="filter-pills" style="margin:0;">
-    <span class="pill active">Todos</span>
-    <span class="pill">Activos</span>
-    <span class="pill">Inactivos</span>
-  </div>
 </div>
 
 <div class="card">
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>Nombre</th><th>Cedula</th><th>Especialidades</th><th>Correo</th><th>Estado</th>
+        <th>Nombre</th><th>Cedula</th><th>Correo</th><th>Estado</th>
         <th style="text-align:right;">Acciones</th>
       </tr></thead>
       <tbody>
-        {% for d in [
-          {"id":1,"nombre":"Alejandro","apP":"Garcia","apM":"Perez",
-           "cedula":"CED-12345678","email":"a.garcia [at] medinfc.com","esp":"Geriatria, Medicina Interna","activo":true},
-          {"id":2,"nombre":"Laura","apP":"Martinez","apM":"Soto",
-           "cedula":"CED-23456789","email":"l.martinez [at] medinfc.com","esp":"Cardiologia","activo":true},
-          {"id":3,"nombre":"Fernando","apP":"Reyes","apM":"Luna",
-           "cedula":"CED-34567890","email":"f.reyes [at] medinfc.com","esp":"Neurologia","activo":true},
-          {"id":4,"nombre":"Patricia","apP":"Vega","apM":"Castillo",
-           "cedula":"CED-45678901","email":"p.vega [at] medinfc.com","esp":"Geriatria","activo":false}
-        ] %}
+        {% for m in medicos %}
+        {# m: (0=id, 1=nombre, 2=apellido_p, 3=apellido_m, 4=cedula, 5=email, 6=activo) #}
         <tr data-searchable>
-          <td style="font-weight:500;">Dr(a). {{ d.nombre }} {{ d.apP }} {{ d.apM }}</td>
-          <td style="font-family:monospace;font-size:12px;">{{ d.cedula }}</td>
+          <td style="font-weight:500;">Dr(a). {{ m[1] }} {{ m[2] }} {{ m[3] }}</td>
+          <td style="font-family:monospace;font-size:12px;">{{ m[4] }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ m[5] }}</td>
           <td>
-            {% for e in d.esp.split(', ') %}
-            <span class="badge badge-blue" style="margin-right:3px;">{{ e }}</span>
-            {% endfor %}
-          </td>
-          <td style="font-size:13px;color:#5D6D7E;">{{ d.email }}</td>
-          <td>
-            {% if d.activo %}<span class="badge badge-green">Activo</span>
+            {% if m[6] %}<span class="badge badge-green">Activo</span>
             {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
           </td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
-              onclick="editMedico({{ d.id }},'{{ d.nombre }}','{{ d.apP }}','{{ d.apM }}','{{ d.cedula }}','{{ d.esp }}',{{ 'true' if d.activo else 'false' }})">
+              onclick="editMedico({{ m[0] }},'{{ m[1]|e }}','{{ m[2]|e }}','{{ m[3]|e }}','{{ m[4]|e }}','{{ m[5]|e }}')">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
-              onclick="openConfirm('Eliminar Dr(a). {{ d.nombre }} {{ d.apP }}?','Se eliminara el medico y todas sus asignaciones del sistema.')">
+              onclick="openConfirm({{ m[0] }},'Eliminar Dr(a). {{ m[1]|e }} {{ m[2]|e }}?','Se desactivara el medico del sistema.')">
               <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
             </button>
           </td>
@@ -79,44 +61,40 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-        <div class="form-group">
-          <label class="form-label">Nombre *</label>
-          <input class="form-control" id="m-nombre" placeholder="Alejandro"/>
+    <form method="POST" action="{{ url_for('admin_medicos') }}">
+      <input type="hidden" id="m-acc" name="acc" value="I">
+      <input type="hidden" id="m-id" name="id_medico" value="">
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Nombre *</label>
+            <input class="form-control" id="m-nombre" name="nombre" placeholder="Alejandro"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ap. Paterno *</label>
+            <input class="form-control" id="m-apP" name="apellido_p" placeholder="Garcia"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ap. Materno</label>
+            <input class="form-control" id="m-apM" name="apellido_m" placeholder="Perez"/>
+          </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Ap. Paterno *</label>
-          <input class="form-control" id="m-apP" placeholder="Garcia"/>
+          <label class="form-label">Cedula Profesional *</label>
+          <input class="form-control" id="m-cedula" name="cedula" style="font-family:monospace;" placeholder="CED-00000000"/>
         </div>
         <div class="form-group">
-          <label class="form-label">Ap. Materno</label>
-          <input class="form-control" id="m-apM" placeholder="Perez"/>
+          <label class="form-label">Correo electronico *</label>
+          <input class="form-control" id="m-email" name="email" type="text" placeholder="medico@medinfc.com"/>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Cedula Profesional *</label>
-        <input class="form-control" id="m-cedula" style="font-family:monospace;" placeholder="CED-00000000"/>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-medico')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+        </button>
       </div>
-      <div class="form-group">
-        <label class="form-label">Correo electronico *</label>
-        <input class="form-control" id="m-email" type="text" placeholder="medico [at] medinfc.com"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Especialidades</label>
-        <input class="form-control" id="m-esp" placeholder="Geriatria, Medicina Interna..."/>
-      </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:12px;">
-        <label class="form-label" style="margin:0;">Activo</label>
-        <input type="checkbox" id="m-activo" checked style="width:18px;height:18px;accent-color:#1B4F72;cursor:pointer;"/>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-medico')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-medico')">
-        <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
-      </button>
-    </div>
+    </form>
   </div>
 </div>
 
@@ -129,23 +107,27 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
-        </div>
-        <div>
-          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
-          <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+    <form method="POST" action="{{ url_for('admin_medicos') }}">
+      <input type="hidden" name="acc" value="D">
+      <input type="hidden" id="del-id-medico" name="id_medico" value="">
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+          </div>
+          <div>
+            <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
+            <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
-      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
-        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
-      </button>
-    </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+        <button type="submit" class="btn btn-danger">
+          <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -154,20 +136,23 @@
 lucide.createIcons();
 function setModoNuevo(){
   document.getElementById('modal-medico-title').textContent='Nuevo Medico';
-  ['m-nombre','m-apP','m-apM','m-cedula','m-email','m-esp'].forEach(function(id){document.getElementById(id).value='';});
-  document.getElementById('m-activo').checked=true;
+  document.getElementById('m-acc').value='I';
+  document.getElementById('m-id').value='';
+  ['m-nombre','m-apP','m-apM','m-cedula','m-email'].forEach(function(id){document.getElementById(id).value='';});
 }
-function editMedico(id,nombre,apP,apM,cedula,esp,activo){
+function editMedico(id,nombre,apP,apM,cedula,email){
   document.getElementById('modal-medico-title').textContent='Editar Medico';
+  document.getElementById('m-acc').value='U';
+  document.getElementById('m-id').value=id;
   document.getElementById('m-nombre').value=nombre;
   document.getElementById('m-apP').value=apP;
   document.getElementById('m-apM').value=apM;
   document.getElementById('m-cedula').value=cedula;
-  document.getElementById('m-esp').value=esp;
-  document.getElementById('m-activo').checked=activo;
+  document.getElementById('m-email').value=email;
   openModal('modal-medico'); lucide.createIcons();
 }
-function openConfirm(title,msg){
+function openConfirm(id,title,msg){
+  document.getElementById('del-id-medico').value=id;
   document.getElementById('confirm-title').textContent=title;
   document.getElementById('confirm-msg').textContent=msg;
   openModal('modal-confirm'); lucide.createIcons();

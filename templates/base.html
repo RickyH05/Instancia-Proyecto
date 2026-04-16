@@ -50,7 +50,7 @@
       <a href="{{ url_for('doctor_pacientes') }}"  class="nav-item"><i data-lucide="users"          class="nav-icon"></i>Pacientes</a>
       <a href="{{ url_for('doctor_recetas') }}"    class="nav-item"><i data-lucide="clipboard-list" class="nav-icon"></i>Recetas</a>
       <a href="{{ url_for('doctor_reportes') }}"   class="nav-item"><i data-lucide="bar-chart-3"    class="nav-icon"></i>Reportes</a>
-      <a href="{{ url_for('doctor_alertas') }}"    class="nav-item"><i data-lucide="bell"           class="nav-icon"></i>Alertas <span class="nav-badge">2</span></a>
+      <a href="{{ url_for('doctor_alertas') }}"    class="nav-item"><i data-lucide="bell"           class="nav-icon"></i>Alertas {% if alertas_badge > 0 %}<span class="nav-badge">{{ alertas_badge }}</span>{% endif %}</a>
       <div class="nav-label">IoT</div>
       <a href="{{ url_for('doctor_proximidad_mapa') }}"      class="nav-item"><i data-lucide="map-pin" class="nav-icon"></i>Mapa Proximidad</a>
       <a href="{{ url_for('doctor_proximidad_historial') }}" class="nav-item"><i data-lucide="history"  class="nav-icon"></i>Historial GPS</a>
@@ -59,7 +59,7 @@
     {% else %}
       <a href="{{ url_for('cuidador_home') }}"      class="nav-item"><i data-lucide="home"       class="nav-icon"></i>Inicio</a>
       <a href="{{ url_for('cuidador_historial') }}" class="nav-item"><i data-lucide="clock"      class="nav-icon"></i>Historial NFC</a>
-      <a href="{{ url_for('cuidador_alertas') }}"   class="nav-item"><i data-lucide="bell"       class="nav-icon"></i>Alertas <span class="nav-badge">2</span></a>
+      <a href="{{ url_for('cuidador_alertas') }}"   class="nav-item"><i data-lucide="bell"       class="nav-icon"></i>Alertas {% if alertas_badge > 0 %}<span class="nav-badge">{{ alertas_badge }}</span>{% endif %}</a>
       <div class="nav-label">IoT</div>
       <a href="{{ url_for('cuidador_mi_gps') }}" class="nav-item"><i data-lucide="smartphone" class="nav-icon"></i>Mi Dispositivo GPS</a>
     {% endif %}

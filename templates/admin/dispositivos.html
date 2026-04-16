@@ -29,7 +29,7 @@
     <div>
       <div class="stat-label">GPS activos</div>
       <div class="stat-value" style="color:#1ABC9C;">
-        {{ dispositivos|selectattr(0,'equalto','GPS')|selectattr(4,'equalto',true)|list|length }}
+        {{ dispositivos|selectattr(0,'equalto','GPS')|selectattr(5,'equalto',true)|list|length }}
       </div>
     </div>
     <div class="stat-icon" style="background:rgba(26,188,156,.12);">
@@ -40,7 +40,7 @@
     <div>
       <div class="stat-label">Beacons activos</div>
       <div class="stat-value" style="color:#8E44AD;">
-        {{ dispositivos|selectattr(0,'equalto','BEACON')|selectattr(4,'equalto',true)|list|length }}
+        {{ dispositivos|selectattr(0,'equalto','BEACON')|selectattr(5,'equalto',true)|list|length }}
       </div>
     </div>
     <div class="stat-icon" style="background:rgba(142,68,173,.12);">
@@ -83,9 +83,9 @@
           <td style="color:#9CA3AF;font-size:12px;">{{ d[1] }}</td>
           <td style="font-family:monospace;font-size:13px;font-weight:500;">{{ d[2] }}</td>
           <td style="font-size:13px;color:#5D6D7E;">{{ d[3] or '—' }}</td>
-          <td style="font-size:13px;">{{ d[4] or '—' }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ d[4] or '—' }}</td>
           <td>
-            {% if d[4] %}
+            {% if d[5] %}
               <span class="badge badge-green">Activo</span>
             {% else %}
               <span class="badge badge-gray">Inactivo</span>

@@ -15,63 +15,37 @@
     <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
     <input id="search-input" class="form-control" placeholder="Buscar por UUID, nombre o paciente..."/>
   </div>
-  <div class="filter-pills" style="margin:0;">
-    <span class="pill active">Todos</span>
-    <span class="pill">Activos</span>
-    <span class="pill">Inactivos</span>
-  </div>
 </div>
 
 <div class="card">
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>UUID</th><th>Nombre</th><th>Paciente</th><th>Ubicacion en domicilio</th>
-        <th>Radio</th><th>Estado</th><th style="text-align:right;">Acciones</th>
+        <th>UUID</th><th>Nombre</th><th>Paciente asignado</th>
+        <th>Estado</th><th style="text-align:right;">Acciones</th>
       </tr></thead>
       <tbody>
-        {% for b in [
-          {"id":"b1","uuid":"FDA50693-A4E2-4FB1","nombre":"Beacon Sala - Lopez",
-           "pac":"Juan Lopez Martinez","loc":"Sala principal","radio":5,"activo":true},
-          {"id":"b2","uuid":"B9407F30-F5F8-466E","nombre":"Beacon Recamara - Lopez",
-           "pac":"Juan Lopez Martinez","loc":"Recamara","radio":3,"activo":true},
-          {"id":"b3","uuid":"E2C56DB5-DFFB-48D2","nombre":"Beacon Cocina - Torres",
-           "pac":"Ana Torres Ramirez","loc":"Cocina","radio":4,"activo":true},
-          {"id":"b4","uuid":"D0D3FA86-CA76-45EC","nombre":"Beacon Sala - Ruiz",
-           "pac":"Carlos Ruiz Sanchez","loc":"Sala","radio":5,"activo":true},
-          {"id":"b5","uuid":"7C4B6D1E-8A3F-4E2B","nombre":"Beacon Extra",
-           "pac":"","loc":"","radio":5,"activo":false}
-        ] %}
+        {% for b in beacons %}
+        {# b: (0=id_disp, 1=ident/uuid, 2=nombre, 3=asignado, 4=activo) #}
         <tr data-searchable>
           <td style="font-family:monospace;font-size:11px;color:#5D6D7E;">
-            {{ b.uuid[:12] }}...
+            {{ b[1][:16] if b[1] else '' }}...
           </td>
-          <td style="font-weight:500;font-size:14px;">{{ b.nombre }}</td>
-          <td style="font-size:13px;color:{% if b.pac %}#2C3E50{% else %}#9CA3AF{% endif %};">
-            {{ b.pac if b.pac else '— Sin asignar —' }}
+          <td style="font-weight:500;font-size:14px;">{{ b[2] }}</td>
+          <td style="font-size:13px;color:{% if b[3] %}#2C3E50{% else %}#9CA3AF{% endif %};">
+            {{ b[3] if b[3] else '— Sin asignar —' }}
           </td>
           <td>
-            {% if b.loc %}
-              <div style="display:flex;align-items:center;gap:5px;">
-                <i data-lucide="map-pin" style="width:12px;height:12px;color:#1ABC9C;"></i>
-                <span style="font-size:13px;color:#5D6D7E;">{{ b.loc }}</span>
-              </div>
-            {% else %}
-              <span style="font-size:12px;color:#9CA3AF;font-style:italic;">—</span>
-            {% endif %}
-          </td>
-          <td style="font-size:13px;text-align:center;">{{ b.radio }}m</td>
-          <td>
-            {% if b.activo %}<span class="badge badge-green">Activo</span>
+            {% if b[4] %}<span class="badge badge-green">Activo</span>
             {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
           </td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
-              onclick="editBeacon('{{ b.id }}','{{ b.uuid }}','{{ b.nombre }}','{{ b.pac }}','{{ b.loc }}','{{ b.radio }}',{{ 'true' if b.activo else 'false' }})">
+              onclick="editBeacon({{ b[0] }},'{{ b[1]|e }}','{{ b[2]|e }}')">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
-              onclick="openConfirm('Eliminar beacon: {{ b.nombre }}?','Se eliminara el beacon y todos sus registros de proximidad asociados.')">
+              onclick="openConfirm({{ b[0] }},'Eliminar beacon: {{ b[2]|e }}?','Se eliminara el beacon y todos sus registros de proximidad asociados.')">
               <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
             </button>
           </td>
@@ -91,55 +65,50 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">UUID *</label>
-        <input class="form-control" id="b-uuid" style="font-family:monospace;font-size:13px;"
-          placeholder="FDA50693-A4E2-4FB1-AFCF-C6EB07647825"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Nombre *</label>
-        <input class="form-control" id="b-nombre" placeholder="Beacon Sala - Lopez"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Paciente</label>
-        <select class="form-control" id="b-pac">
-          <option value="">— Sin asignar —</option>
-          <option>Juan Lopez Martinez</option>
-          <option>Ana Torres Ramirez</option>
-          <option>Carlos Ruiz Sanchez</option>
-          <option>Elena Morales Diaz</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Ubicacion en domicilio</label>
-        <input class="form-control" id="b-loc" placeholder="Sala principal, Recamara, Cocina..."/>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+    <form method="POST" action="{{ url_for('admin_beacon') }}">
+      <input type="hidden" id="b-acc" name="acc" value="I">
+      <input type="hidden" id="b-id" name="id_beacon" value="">
+      <div class="modal-body">
         <div class="form-group">
-          <label class="form-label">Radio (metros)</label>
-          <input class="form-control" id="b-radio" type="number" min="1" max="50" value="5"/>
+          <label class="form-label">UUID *</label>
+          <input class="form-control" id="b-uuid" name="uuid" style="font-family:monospace;font-size:13px;"
+            placeholder="FDA50693-A4E2-4FB1-AFCF-C6EB07647825"/>
         </div>
         <div class="form-group">
-          <label class="form-label">Latitud</label>
-          <input class="form-control" id="b-lat" placeholder="19.4326"/>
+          <label class="form-label">Nombre *</label>
+          <input class="form-control" id="b-nombre" name="nombre" placeholder="Beacon Sala - Lopez"/>
         </div>
         <div class="form-group">
-          <label class="form-label">Longitud</label>
-          <input class="form-control" id="b-lng" placeholder="-99.1332"/>
+          <label class="form-label">Paciente</label>
+          <select class="form-control" id="b-pac" name="id_paciente">
+            <option value="">— Sin asignar —</option>
+            {% for p in pacientes %}
+            <option value="{{ p[0] }}">{{ p[1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Radio (metros)</label>
+            <input class="form-control" id="b-radio" name="radio" type="number" min="1" max="50" value="5"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Latitud</label>
+            <input class="form-control" id="b-lat" name="lat" placeholder="19.4326"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Longitud</label>
+            <input class="form-control" id="b-lon" name="lon" placeholder="-99.1332"/>
+          </div>
         </div>
       </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:12px;">
-        <label class="form-label" style="margin:0;">Activo</label>
-        <input type="checkbox" id="b-activo" checked style="width:18px;height:18px;accent-color:#1B4F72;cursor:pointer;"/>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-beacon')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+        </button>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-beacon')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-beacon')">
-        <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
-      </button>
-    </div>
+    </form>
   </div>
 </div>
 
@@ -152,23 +121,27 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
-        </div>
-        <div>
-          <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
-          <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+    <form method="POST" action="{{ url_for('admin_beacon') }}">
+      <input type="hidden" name="acc" value="D">
+      <input type="hidden" id="del-id-beacon" name="id_beacon" value="">
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+          </div>
+          <div>
+            <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
+            <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
-      <button class="btn btn-danger" onclick="closeModal('modal-confirm')">
-        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
-      </button>
-    </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+        <button type="submit" class="btn btn-danger">
+          <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -177,22 +150,22 @@
 lucide.createIcons();
 function setModoNuevo(){
   document.getElementById('modal-beacon-title').textContent='Registrar Beacon BLE';
-  ['b-uuid','b-nombre','b-loc','b-lat','b-lng'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('b-acc').value='I';
+  document.getElementById('b-id').value='';
+  ['b-uuid','b-nombre','b-lat','b-lon'].forEach(function(id){document.getElementById(id).value='';});
   document.getElementById('b-pac').value='';
   document.getElementById('b-radio').value='5';
-  document.getElementById('b-activo').checked=true;
 }
-function editBeacon(id,uuid,nombre,pac,loc,radio,activo){
+function editBeacon(id,uuid,nombre){
   document.getElementById('modal-beacon-title').textContent='Editar Beacon BLE';
+  document.getElementById('b-acc').value='U';
+  document.getElementById('b-id').value=id;
   document.getElementById('b-uuid').value=uuid;
   document.getElementById('b-nombre').value=nombre;
-  document.getElementById('b-pac').value=pac;
-  document.getElementById('b-loc').value=loc;
-  document.getElementById('b-radio').value=radio;
-  document.getElementById('b-activo').checked=activo;
   openModal('modal-beacon'); lucide.createIcons();
 }
-function openConfirm(title,msg){
+function openConfirm(id,title,msg){
+  document.getElementById('del-id-beacon').value=id;
   document.getElementById('confirm-title').textContent=title;
   document.getElementById('confirm-msg').textContent=msg;
   openModal('modal-confirm'); lucide.createIcons();

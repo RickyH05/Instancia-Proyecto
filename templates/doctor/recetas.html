@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="page-header">
-  <div><h1>Recetas</h1><p>{{ 5 }} prescripciones activas</p></div>
+  <div><h1>Recetas</h1><p>{{ recetas|length }} prescripciones</p></div>
   <button class="btn btn-primary" onclick="openModal('modal-receta')">
     <i data-lucide="plus" style="width:16px;height:16px;"></i> Nueva Receta
   </button>
@@ -14,10 +14,9 @@
 <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
   <select class="form-control" style="max-width:220px;">
     <option>Todos los pacientes</option>
-    <option>Juan Lopez Martinez</option>
-    <option>Ana Torres Ramirez</option>
-    <option>Carlos Ruiz Sanchez</option>
-    <option>Elena Morales Diaz</option>
+    {% for p in pacientes %}
+    <option>{{ p[1] }}</option>
+    {% endfor %}
   </select>
   <div class="filter-pills" style="margin:0;">
     <span class="pill active">Todas</span>
@@ -29,43 +28,38 @@
 
 <!-- Lista de recetas -->
 <div style="display:flex;flex-direction:column;gap:14px;">
-  {% for rx in [
-    {"pac":"Juan Lopez Martinez",   "ini":"2026-03-10","fin":"2026-06-10","status":"vigente","meds":[("Metformina 500mg","12h","08:00"),("Losartan 50mg","24h","08:00"),("Atorvastatina 20mg","24h","21:00")]},
-    {"pac":"Ana Torres Ramirez",    "ini":"2026-03-08","fin":"2026-06-08","status":"vigente","meds":[("Enalapril 10mg","12h","07:00"),("Furosemida 40mg","24h","08:00")]},
-    {"pac":"Carlos Ruiz Sanchez",   "ini":"2026-02-01","fin":"2026-05-01","status":"vigente","meds":[("Metformina 500mg","8h","08:00")]},
-    {"pac":"Elena Morales Diaz",    "ini":"2026-03-01","fin":"2026-06-01","status":"vigente","meds":[("Levotiroxina 100mcg","24h","06:00"),("Losartan 50mg","24h","08:00")]},
-    {"pac":"Juan Lopez Martinez",   "ini":"2025-12-01","fin":"2026-03-01","status":"vencida","meds":[("Metformina 500mg","8h","08:00")]}
-  ] %}
-  <div style="background:#ffffff;border-radius:12px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid {% if rx.status=='vigente' %}#1ABC9C{% elif rx.status=='vencida' %}#9CA3AF{% else %}#E74C3C{% endif %};">
+  {% for rx in recetas %}
+  <div style="background:#ffffff;border-radius:12px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid {% if rx.estado=='vigente' %}#1ABC9C{% elif rx.estado=='vencida' %}#9CA3AF{% else %}#E74C3C{% endif %};">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
       <div>
-        <div style="font-weight:700;font-size:15px;color:#2C3E50;">{{ rx.pac }}</div>
+        <div style="font-weight:700;font-size:15px;color:#2C3E50;">{{ rx.pac_nombre }}</div>
         <div style="font-size:13px;color:#5D6D7E;margin-top:2px;">
-          Dr. Alejandro Garcia &nbsp;·&nbsp; {{ rx.ini }} → {{ rx.fin }}
+          {{ session.nombre }} &nbsp;·&nbsp; {{ rx.ini }} → {{ rx.fin }}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="badge {% if rx.status=='vigente' %}badge-green{% elif rx.status=='vencida' %}badge-gray{% else %}badge-red{% endif %}">
-          {{ rx.status|capitalize }}
+        <span class="badge {% if rx.estado=='vigente' %}badge-green{% elif rx.estado=='vencida' %}badge-gray{% else %}badge-red{% endif %}">
+          {{ rx.estado|capitalize }}
         </span>
-        <button class="btn btn-ghost btn-sm" onclick="openModal('modal-receta')" title="Editar">
-          <i data-lucide="edit-2" style="width:14px;height:14px;"></i>
-        </button>
       </div>
     </div>
     <!-- Medicamentos -->
     <div style="display:flex;flex-direction:column;gap:6px;">
       {% for m in rx.meds %}
       <div style="background:#F4F6F8;border-radius:6px;padding:8px 14px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
-        <span style="font-weight:600;font-size:13px;color:#2C3E50;">{{ m[0] }}</span>
-        <span style="font-size:12px;color:#5D6D7E;">Cada {{ m[1] }}</span>
+        <span style="font-weight:600;font-size:13px;color:#2C3E50;">{{ m.nombre }}</span>
+        <span style="font-size:12px;color:#5D6D7E;">Cada {{ m.freq }}</span>
         <span style="font-size:12px;color:#5D6D7E;display:flex;align-items:center;gap:4px;">
-          <i data-lucide="clock" style="width:12px;height:12px;"></i> {{ m[2] }}
+          <i data-lucide="clock" style="width:12px;height:12px;"></i> {{ m.hora }}
         </span>
       </div>
+      {% else %}
+      <div style="font-size:13px;color:#9CA3AF;padding:4px 0;">Sin medicamentos registrados.</div>
       {% endfor %}
     </div>
   </div>
+  {% else %}
+  <div style="text-align:center;color:#9CA3AF;padding:40px;">No hay recetas registradas.</div>
   {% endfor %}
 </div>
 
@@ -86,23 +80,22 @@
           <label class="form-label">Paciente *</label>
           <select class="form-control">
             <option value="">— Seleccionar —</option>
-            <option>Juan Lopez Martinez</option>
-            <option>Ana Torres Ramirez</option>
-            <option>Carlos Ruiz Sanchez</option>
-            <option>Elena Morales Diaz</option>
+            {% for p in pacientes %}
+            <option value="{{ p[0] }}">{{ p[1] }}</option>
+            {% endfor %}
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Medico</label>
-          <input class="form-control" value="Dr. Alejandro Garcia" readonly style="background:#F4F6F8;"/>
+          <input class="form-control" value="{{ session.nombre }}" readonly style="background:#F4F6F8;"/>
         </div>
         <div class="form-group">
           <label class="form-label">Fecha inicio *</label>
-          <input class="form-control" type="date" value="2026-03-24"/>
+          <input class="form-control" type="date"/>
         </div>
         <div class="form-group">
           <label class="form-label">Fecha fin *</label>
-          <input class="form-control" type="date" value="2026-06-24"/>
+          <input class="form-control" type="date"/>
         </div>
       </div>
 
@@ -122,12 +115,9 @@
                 <label class="form-label" style="font-size:11px;">Medicamento *</label>
                 <select class="form-control" style="height:38px;font-size:13px;">
                   <option value="">— Seleccionar —</option>
-                  <option>Metformina 500mg</option>
-                  <option>Losartan 50mg</option>
-                  <option>Atorvastatina 20mg</option>
-                  <option>Enalapril 10mg</option>
-                  <option>Furosemida 40mg</option>
-                  <option>Levotiroxina 100mcg</option>
+                  {% for med in medicamentos %}
+                  <option value="{{ med[0] }}">{{ med[1] }}</option>
+                  {% endfor %}
                 </select>
               </div>
               <div class="form-group" style="margin:0;">
@@ -176,6 +166,9 @@
 <script>
 lucide.createIcons();
 
+var medOptsHtml = '<option value="">— Seleccionar —</option>'
+  + [{% for med in medicamentos %}'<option value="{{ med[0] }}">{{ med[1]|e }}</option>'{% if not loop.last %},{% endif %}{% endfor %}].join('');
+
 function addMed() {
   var list = document.getElementById('meds-list');
   var div = document.createElement('div');
@@ -185,15 +178,7 @@ function addMed() {
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">
       <div class="form-group" style="margin:0;">
         <label class="form-label" style="font-size:11px;">Medicamento *</label>
-        <select class="form-control" style="height:38px;font-size:13px;">
-          <option value="">— Seleccionar —</option>
-          <option>Metformina 500mg</option>
-          <option>Losartan 50mg</option>
-          <option>Atorvastatina 20mg</option>
-          <option>Enalapril 10mg</option>
-          <option>Furosemida 40mg</option>
-          <option>Levotiroxina 100mcg</option>
-        </select>
+        <select class="form-control" style="height:38px;font-size:13px;">${medOptsHtml}</select>
       </div>
       <div class="form-group" style="margin:0;">
         <label class="form-label" style="font-size:11px;">Frecuencia</label>
