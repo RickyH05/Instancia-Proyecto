@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import avatar %}
 {% block title %}Pacientes{% endblock %}
 {% block page_title %}Pacientes{% endblock %}
 
@@ -29,7 +30,7 @@
   {% for p in pacientes %}
   {% set rx_vig = p.recetas | selectattr('estado', 'equalto', 'vigente') | list %}
   <div data-searchable style="background:#ffffff;border-radius:12px;padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.06);display:flex;align-items:flex-start;gap:14px;">
-    <div class="patient-avatar" style="flex-shrink:0;">{{ p.nombre[:2].upper() }}</div>
+    {{ avatar(p.foto if p.foto is defined else '', p.nombre, 40) }}
     <div style="flex:1;min-width:0;">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <div>
@@ -66,7 +67,7 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <form method="post" action="{{ url_for('doctor_paciente_nuevo') }}">
+    <form method="post" action="{{ url_for('doctor_paciente_nuevo') }}" enctype="multipart/form-data">
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
         <div class="form-group">
@@ -92,6 +93,11 @@
           <label class="form-label">Fecha de nacimiento</label>
           <input class="form-control" name="fecha_nac" type="date"/>
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Foto de perfil</label>
+        <input class="form-control" type="file" name="foto" accept="image/png,image/jpeg,image/webp"/>
+        <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">PNG, JPG o WEBP · máx. 2 MB</div>
       </div>
     </div>
     <div class="modal-footer">

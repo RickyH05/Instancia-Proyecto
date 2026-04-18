@@ -3,5 +3,9 @@ venv/
 .venv/
 __pycache__/
 *.pyc
-.DS_Storevenv/
-__pycache__/
+.DS_Store
+.env
+
+# Fotos de perfil subidas por usuarios
+static/img/uploads/*
+!static/img/uploads/.gitkeep

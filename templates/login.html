@@ -48,33 +48,6 @@
       font-family: inherit;
     }
     .btn-login:hover { background: #154060 !important; }
-    .demo-box {
-      margin-top: 28px;
-      background: #F8FAFC !important;
-      border-radius: 8px;
-      border: 1px solid rgba(0,0,0,.08);
-      padding: 14px;
-      color: #2C3E50;
-    }
-    .demo-box .demo-title {
-      font-size: 12px; font-weight: 700; color: #5D6D7E;
-      text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px;
-    }
-    .demo-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 8px 10px; border-radius: 8px;
-      cursor: pointer; transition: background .15s; min-height: 44px;
-    }
-    .demo-item:hover { background: rgba(27,79,114,.06); }
-    .demo-pill {
-      font-size: 10px; font-weight: 700;
-      padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
-    }
-    .pill-admin    { background: rgba(142,68,173,.12); color: #8E44AD; }
-    .pill-medico   { background: rgba(27,79,114,.10);  color: #1B4F72; }
-    .pill-cuidador { background: rgba(26,188,156,.12); color: #1ABC9C; }
-    .demo-creds .d-email { font-size: 13px; font-weight: 500; color: #2C3E50; }
-    .demo-creds .d-pass  { font-size: 11px; color: #5D6D7E; }
     .login-right {
       flex: 1;
       background: #1B4F72;
@@ -180,34 +153,6 @@
     <button type="submit" class="btn-login">Iniciar sesion</button>
   </form>
 
-  <!-- Demo box — los emails se inyectan por JS para evitar Cloudflare email-protection -->
-  <div class="demo-box">
-    <div class="demo-title">Cuentas de demostracion</div>
-
-    <div class="demo-item" id="btn-admin">
-      <span class="demo-pill pill-admin">Admin</span>
-      <div class="demo-creds">
-        <div class="d-email" id="lbl-admin"></div>
-        <div class="d-pass">demo123</div>
-      </div>
-    </div>
-
-    <div class="demo-item" id="btn-medico">
-      <span class="demo-pill pill-medico">Medico</span>
-      <div class="demo-creds">
-        <div class="d-email" id="lbl-medico"></div>
-        <div class="d-pass">demo123</div>
-      </div>
-    </div>
-
-    <div class="demo-item" id="btn-cuidador">
-      <span class="demo-pill pill-cuidador">Cuidador</span>
-      <div class="demo-creds">
-        <div class="d-email" id="lbl-cuidador"></div>
-        <div class="d-pass">demo123</div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <div class="login-right">
@@ -230,30 +175,6 @@
 
 <script>
   lucide.createIcons();
-
-  // ── Construir emails en JS para evitar que Cloudflare los ofusque en el HTML ──
-  // Separamos usuario, dominio y TLD para que CF no los detecte como email
-  var cuentas = [
-    { id:'admin',    u:'admin',    d:'medinfc', t:'com', pw:'demo123' },
-    { id:'medico',   u:'a.garcia', d:'medinfc', t:'com', pw:'demo123' },
-    { id:'cuidador', u:'m.gomez',  d:'medinfc', t:'com', pw:'demo123' }
-  ];
-
-  cuentas.forEach(function(c) {
-    var mail = c.u + String.fromCharCode(64) + c.d + '.' + c.t;
-    // Mostrar email en el label
-    var lbl = document.getElementById('lbl-' + c.id);
-    if (lbl) lbl.textContent = mail;
-    // Click -> rellenar formulario
-    var btn = document.getElementById('btn-' + c.id);
-    if (btn) {
-      btn.addEventListener('click', function() {
-        document.getElementById('email').value = mail;
-        document.getElementById('password').value = c.pw;
-        document.getElementById('email').focus();
-      });
-    }
-  });
 </script>
 </body>
 </html>

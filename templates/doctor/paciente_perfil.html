@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import avatar %}
 {% block title %}Perfil Paciente{% endblock %}
 {% block page_title %}Perfil del Paciente{% endblock %}
 
@@ -10,9 +11,7 @@
 <!-- Header paciente -->
 <div style="background:#ffffff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:20px;">
   <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
-    <div class="patient-avatar" style="width:56px;height:56px;font-size:18px;">
-      {{ paciente.nombre[:2].upper() if paciente.nombre else '??' }}
-    </div>
+    {{ avatar(paciente.foto if paciente.foto is defined else '', paciente.nombre, 56) }}
     <div style="flex:1;">
       <h2 style="font-size:20px;font-weight:700;margin-bottom:4px;color:#2C3E50;">{{ paciente.nombre }}</h2>
       <div style="font-size:12px;color:#5D6D7E;font-family:monospace;margin-bottom:8px;">{{ paciente.curp }}</div>

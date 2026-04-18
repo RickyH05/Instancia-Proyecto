@@ -65,20 +65,19 @@
 
 <!-- MODAL Nueva Receta -->
 <div id="modal-receta" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-receta')">
-  <div class="modal-box" style="max-width:600px;">
+  <div class="modal-box" style="max-width:640px;">
     <div class="modal-header">
       <span class="modal-title">Nueva Receta</span>
-      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-receta')">
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-receta')">
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
+    <form method="POST" action="{{ url_for('doctor_receta_desde_lista') }}">
     <div class="modal-body">
-
-      <!-- Datos generales -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
         <div class="form-group">
           <label class="form-label">Paciente *</label>
-          <select class="form-control">
+          <select class="form-control" name="id_paciente" required>
             <option value="">— Seleccionar —</option>
             {% for p in pacientes %}
             <option value="{{ p[0] }}">{{ p[1] }}</option>
@@ -86,62 +85,56 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Medico</label>
+          <label class="form-label">Médico</label>
           <input class="form-control" value="{{ session.nombre }}" readonly style="background:#F4F6F8;"/>
         </div>
         <div class="form-group">
+          <label class="form-label">Fecha emisión *</label>
+          <input class="form-control" type="date" name="fecha_emision" required/>
+        </div>
+        <div class="form-group"><!-- spacer --></div>
+        <div class="form-group">
           <label class="form-label">Fecha inicio *</label>
-          <input class="form-control" type="date"/>
+          <input class="form-control" type="date" name="fecha_inicio" required/>
         </div>
         <div class="form-group">
           <label class="form-label">Fecha fin *</label>
-          <input class="form-control" type="date"/>
+          <input class="form-control" type="date" name="fecha_fin" required/>
         </div>
       </div>
-
-      <!-- Medicamentos -->
       <div style="border-top:1px solid rgba(0,0,0,.06);padding-top:16px;margin-top:4px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <span style="font-weight:600;font-size:14px;color:#2C3E50;">Medicamentos</span>
-          <button class="btn btn-ghost btn-sm" onclick="addMed()" type="button">
+          <button class="btn btn-ghost btn-sm" onclick="addMedRec()" type="button">
             <i data-lucide="plus" style="width:14px;height:14px;"></i> Agregar
           </button>
         </div>
-        <div id="meds-list">
-          <!-- Medicamento 1 -->
+        <div id="meds-list-rec">
           <div class="med-row" style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:10px;">
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">
+            <div style="display:grid;grid-template-columns:1fr 70px 70px 70px 70px 70px auto;gap:8px;align-items:end;">
               <div class="form-group" style="margin:0;">
-                <label class="form-label" style="font-size:11px;">Medicamento *</label>
-                <select class="form-control" style="height:38px;font-size:13px;">
-                  <option value="">— Seleccionar —</option>
-                  {% for med in medicamentos %}
-                  <option value="{{ med[0] }}">{{ med[1] }}</option>
-                  {% endfor %}
-                </select>
+                <label class="form-label" style="font-size:11px;">ID Medicamento *</label>
+                <input class="form-control" name="med_id[]" type="number" min="1" placeholder="ID" style="height:38px;font-size:13px;" required/>
               </div>
               <div class="form-group" style="margin:0;">
-                <label class="form-label" style="font-size:11px;">Frecuencia</label>
-                <select class="form-control" style="height:38px;font-size:13px;">
-                  <option>Cada 4h</option>
-                  <option>Cada 6h</option>
-                  <option>Cada 8h</option>
-                  <option selected>Cada 12h</option>
-                  <option>Cada 24h</option>
-                </select>
+                <label class="form-label" style="font-size:11px;">Dosis</label>
+                <input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/>
               </div>
               <div class="form-group" style="margin:0;">
-                <label class="form-label" style="font-size:11px;">Primera toma</label>
-                <input class="form-control" type="time" value="08:00" style="height:38px;font-size:13px;"/>
+                <label class="form-label" style="font-size:11px;">Unidad ID</label>
+                <input class="form-control" name="unidad[]" type="number" min="1" value="1" style="height:38px;font-size:13px;"/>
               </div>
               <div class="form-group" style="margin:0;">
-                <label class="form-label" style="font-size:11px;">Tolerancia</label>
-                <select class="form-control" style="height:38px;font-size:13px;">
-                  <option>15 min</option>
-                  <option selected>30 min</option>
-                  <option>45 min</option>
-                  <option>60 min</option>
-                </select>
+                <label class="form-label" style="font-size:11px;">Frec. (h)</label>
+                <input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Tol. (min)</label>
+                <input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">1ª toma</label>
+                <input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/>
               </div>
               <button onclick="this.closest('.med-row').remove()" type="button"
                 style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
@@ -153,11 +146,12 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modal-receta')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-receta')">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('modal-receta')">Cancelar</button>
+      <button type="submit" class="btn btn-primary">
         <i data-lucide="save" style="width:15px;height:15px;"></i> Crear Receta
       </button>
     </div>
+    </form>
   </div>
 </div>
 {% endblock %}
@@ -166,38 +160,25 @@
 <script>
 lucide.createIcons();
 
-var medOptsHtml = '<option value="">— Seleccionar —</option>'
-  + [{% for med in medicamentos %}'<option value="{{ med[0] }}">{{ med[1]|e }}</option>'{% if not loop.last %},{% endif %}{% endfor %}].join('');
-
-function addMed() {
-  var list = document.getElementById('meds-list');
+function addMedRec() {
+  var list = document.getElementById('meds-list-rec');
   var div = document.createElement('div');
   div.className = 'med-row';
   div.style.cssText = 'border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:10px;';
   div.innerHTML = `
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">
-      <div class="form-group" style="margin:0;">
-        <label class="form-label" style="font-size:11px;">Medicamento *</label>
-        <select class="form-control" style="height:38px;font-size:13px;">${medOptsHtml}</select>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label class="form-label" style="font-size:11px;">Frecuencia</label>
-        <select class="form-control" style="height:38px;font-size:13px;">
-          <option>Cada 4h</option><option>Cada 6h</option><option>Cada 8h</option>
-          <option selected>Cada 12h</option><option>Cada 24h</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label class="form-label" style="font-size:11px;">Primera toma</label>
-        <input class="form-control" type="time" value="08:00" style="height:38px;font-size:13px;"/>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label class="form-label" style="font-size:11px;">Tolerancia</label>
-        <select class="form-control" style="height:38px;font-size:13px;">
-          <option>15 min</option><option selected>30 min</option>
-          <option>45 min</option><option>60 min</option>
-        </select>
-      </div>
+    <div style="display:grid;grid-template-columns:1fr 70px 70px 70px 70px 70px auto;gap:8px;align-items:end;">
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">ID Medicamento *</label>
+        <input class="form-control" name="med_id[]" type="number" min="1" placeholder="ID" style="height:38px;font-size:13px;" required/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Dosis</label>
+        <input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Unidad ID</label>
+        <input class="form-control" name="unidad[]" type="number" min="1" value="1" style="height:38px;font-size:13px;"/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Frec. (h)</label>
+        <input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Tol. (min)</label>
+        <input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/></div>
+      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">1ª toma</label>
+        <input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/></div>
       <button onclick="this.closest('.med-row').remove()" type="button"
         style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
         <i data-lucide="trash-2" style="width:16px;height:16px;"></i>

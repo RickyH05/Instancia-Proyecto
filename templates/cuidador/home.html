@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import avatar %}
 {% block title %}Inicio — Cuidador{% endblock %}
 {% block page_title %}Inicio{% endblock %}
 {% block content %}
@@ -29,11 +30,27 @@
     <div style="width:48px;height:48px;border-radius:12px;background:rgba(26,188,156,.12);display:flex;align-items:center;justify-content:center;">
       <i data-lucide="map-pin" style="width:24px;height:24px;color:#1ABC9C;"></i>
     </div>
+    {% if gps_resumen %}
     <div style="flex:1;">
-      <div style="font-weight:600;font-size:14px;">Queclink GL300 · <span style="font-family:monospace;font-weight:400;font-size:13px;">356938035643809</span></div>
-      <div style="font-size:13px;color:#5D6D7E;margin-top:2px;">Última posición: En domicilio Juan López · 09:15</div>
+      <div style="font-weight:600;font-size:14px;">
+        {{ gps_resumen.modelo }}
+        <span style="font-family:monospace;font-weight:400;font-size:13px;">· {{ gps_resumen.imei }}</span>
+      </div>
+      <div style="font-size:13px;color:#5D6D7E;margin-top:2px;">
+        {% if gps_resumen.lat %}
+          Última posición: {{ "%.4f"|format(gps_resumen.lat) }}, {{ "%.4f"|format(gps_resumen.lon) }}
+          {% if gps_resumen.ts %} · {{ gps_resumen.ts }}{% endif %}
+        {% else %}
+          Sin posición registrada
+        {% endif %}
+      </div>
     </div>
-    <span class="badge badge-green">Activo</span>
+    <span class="badge {% if gps_resumen.activo %}badge-green{% else %}badge-gray{% endif %}">
+      {{ 'Activo' if gps_resumen.activo else 'Inactivo' }}
+    </span>
+    {% else %}
+    <div style="flex:1;font-size:13px;color:#9CA3AF;">Sin dispositivo GPS asignado.</div>
+    {% endif %}
   </div>
 </div>
 
@@ -45,7 +62,7 @@
   <a href="{{ url_for('cuidador_paciente', id=p.id) }}" class="patient-card">
     <div style="flex:1;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-        <div class="patient-avatar" style="width:36px;height:36px;font-size:12px;">{{ p.nombre[:2].upper() }}</div>
+        {{ avatar(p.foto if p.foto is defined else '', p.nombre, 36) }}
         <div style="font-weight:600;font-size:14px;">{{ p.nombre }}</div>
         {% if p.alertas > 0 %}
         <span style="margin-left:auto;font-size:16px;">🔴</span>

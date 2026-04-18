@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Pacientes{% endblock %}
+{% block page_title %}Pacientes{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Pacientes</h1><p>{{ pacientes|length }} paciente{{ 's' if pacientes|length != 1 }} registrado{{ 's' if pacientes|length != 1 }}</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-pac');setModoNuevo()">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nuevo
+  </button>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por nombre o CURP..."/>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:44px;"></th>
+        <th>Nombre</th><th>CURP</th><th>Nacimiento</th>
+        <th>Estado</th><th style="text-align:right;">Acciones</th>
+      </tr></thead>
+      <tbody>
+        {% for p in pacientes %}
+        {# p: (0=id, 1=nombre, 2=apellido_p, 3=apellido_m, 4=curp, 5=fecha_nac, 6=activo, 7=foto_perfil) #}
+        <tr data-searchable>
+          <td>{{ avatar(p[7], p[1] ~ ' ' ~ p[2], 34) }}</td>
+          <td style="font-weight:500;">{{ p[1] }} {{ p[2] }} {{ p[3] }}</td>
+          <td style="font-family:monospace;font-size:12px;color:#5D6D7E;">{{ p[4] or '—' }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ p[5] or '—' }}</td>
+          <td>
+            {% if p[6] %}<span class="badge badge-green">Activo</span>
+            {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <button class="btn btn-ghost btn-icon btn-sm" title="Asignar diagnóstico"
+              onclick="openAsignarDx({{ p[0] }},'{{ (p[1] ~ ' ' ~ p[2])|e }}')">
+              <i data-lucide="heart-pulse" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </button>
+            <button class="btn btn-ghost btn-icon btn-sm" title="Asignar cuidador"
+              onclick="openAsignarCuid({{ p[0] }},'{{ (p[1] ~ ' ' ~ p[2])|e }}')">
+              <i data-lucide="users" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </button>
+            <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
+              onclick="editPac({{ p[0] }},'{{ p[1]|e }}','{{ p[2]|e }}','{{ p[3]|e }}','{{ p[4]|e }}','{{ p[5] }}')">
+              <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </button>
+            {% if p[6] %}
+            <button class="btn btn-ghost btn-icon btn-sm" title="Desactivar"
+              onclick="openConfirm({{ p[0] }},'{{ (p[1] ~ ' ' ~ p[2])|e }}')">
+              <i data-lucide="user-x" style="width:14px;height:14px;color:#E74C3C;"></i>
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:32px;">Sin pacientes registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════ #}
+{# MODAL — Nuevo / Editar paciente                       #}
+{# ══════════════════════════════════════════════════════ #}
+<div id="modal-pac" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-pac')">
+  <div class="modal-box" style="max-width:580px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-pac-title">Nuevo Paciente</span>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-pac')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_pacientes') }}" enctype="multipart/form-data">
+      <input type="hidden" id="p-acc"  name="acc"         value="I">
+      <input type="hidden" id="p-id"   name="id_paciente" value="">
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Nombre *</label>
+            <input class="form-control" id="p-nombre" name="nombre" placeholder="Juan" required/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ap. Paterno *</label>
+            <input class="form-control" id="p-apP" name="apellido_p" placeholder="Lopez" required/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ap. Materno</label>
+            <input class="form-control" id="p-apM" name="apellido_m" placeholder="Martinez"/>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">CURP *</label>
+            <input class="form-control" id="p-curp" name="curp"
+              style="font-family:monospace;" placeholder="XXXX000000XXXXXXXX"
+              maxlength="18" minlength="18"
+              oninput="this.value=this.value.toUpperCase()" required/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fecha de nacimiento *</label>
+            <input class="form-control" id="p-nac" name="fecha_nac" type="date" required/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Foto de perfil</label>
+          <input class="form-control" type="file" name="foto" accept="image/png,image/jpeg,image/webp"/>
+          <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">PNG, JPG o WEBP · máx. 2 MB · opcional</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-pac')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════ #}
+{# MODAL — Confirmar desactivar                          #}
+{# ══════════════════════════════════════════════════════ #}
+<div id="modal-confirm" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-confirm')">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#E74C3C;">Desactivar paciente</span>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-confirm')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_pacientes') }}">
+      <input type="hidden" name="acc" value="D">
+      <input type="hidden" id="del-id-pac" name="id_paciente" value="">
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i data-lucide="user-x" style="width:24px;height:24px;color:#E74C3C;"></i>
+          </div>
+          <div>
+            <div id="confirm-nombre" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
+            <div style="font-size:14px;color:#5D6D7E;line-height:1.5;">
+              El paciente quedará inactivo. Sus recetas y datos históricos se conservan.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+        <button type="submit" class="btn btn-danger">
+          <i data-lucide="user-x" style="width:14px;height:14px;"></i> Desactivar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════ #}
+{# MODAL — Asignar diagnóstico                           #}
+{# ══════════════════════════════════════════════════════ #}
+<div id="modal-dx" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-dx')">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <span class="modal-title">Asignar Diagnóstico</span>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-dx')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form id="form-dx" method="POST" action="">
+      <div class="modal-body">
+        <p id="dx-info" style="font-size:13px;color:#5D6D7E;margin-bottom:14px;"></p>
+        <div class="form-group">
+          <label class="form-label">Diagnóstico *</label>
+          <select class="form-control" name="id_diagnostico" required>
+            <option value="">— Seleccionar —</option>
+            {% for d in diagnosticos %}
+            <option value="{{ d[0] }}">{{ d[1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-dx')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Asignar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════ #}
+{# MODAL — Asignar cuidador                              #}
+{# ══════════════════════════════════════════════════════ #}
+<div id="modal-cuid" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-cuid')">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <span class="modal-title">Asignar Cuidador</span>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-cuid')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form id="form-cuid" method="POST" action="">
+      <div class="modal-body">
+        <p id="cuid-info" style="font-size:13px;color:#5D6D7E;margin-bottom:14px;"></p>
+        <div class="form-group">
+          <label class="form-label">Cuidador *</label>
+          <select class="form-control" name="id_cuidador" required>
+            <option value="">— Seleccionar —</option>
+            {% for c in cuidadores %}
+            <option value="{{ c[0] }}">{{ c[1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+          <input type="checkbox" id="chk-principal" name="principal" value="1"
+            style="width:16px;height:16px;cursor:pointer;"/>
+          <label for="chk-principal" class="form-label" style="margin:0;cursor:pointer;">
+            Marcar como cuidador principal
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-cuid')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Asignar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>
+lucide.createIcons();
+
+function setModoNuevo() {
+  document.getElementById('modal-pac-title').textContent = 'Nuevo Paciente';
+  document.getElementById('p-acc').value = 'I';
+  document.getElementById('p-id').value  = '';
+  ['p-nombre','p-apP','p-apM','p-curp','p-nac'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+}
+
+function editPac(id, nombre, apP, apM, curp, nac) {
+  document.getElementById('modal-pac-title').textContent = 'Editar Paciente';
+  document.getElementById('p-acc').value    = 'U';
+  document.getElementById('p-id').value     = id;
+  document.getElementById('p-nombre').value = nombre;
+  document.getElementById('p-apP').value    = apP;
+  document.getElementById('p-apM').value    = apM;
+  document.getElementById('p-curp').value   = curp;
+  document.getElementById('p-nac').value    = nac;
+  openModal('modal-pac');
+  lucide.createIcons();
+}
+
+function openConfirm(id, nombre) {
+  document.getElementById('del-id-pac').value    = id;
+  document.getElementById('confirm-nombre').textContent = '¿Desactivar a ' + nombre + '?';
+  openModal('modal-confirm');
+  lucide.createIcons();
+}
+
+function openAsignarDx(idPac, nombre) {
+  document.getElementById('dx-info').textContent = 'Paciente: ' + nombre;
+  document.getElementById('form-dx').action =
+    '/admin/pacientes/' + idPac + '/asignar-diagnostico';
+  openModal('modal-dx');
+  lucide.createIcons();
+}
+
+function openAsignarCuid(idPac, nombre) {
+  document.getElementById('cuid-info').textContent = 'Paciente: ' + nombre;
+  document.getElementById('form-cuid').action =
+    '/admin/pacientes/' + idPac + '/asignar-cuidador';
+  document.getElementById('chk-principal').checked = false;
+  openModal('modal-cuid');
+  lucide.createIcons();
+}
+
+// Búsqueda en tabla
+var inp = document.getElementById('search-input');
+if (inp) {
+  inp.addEventListener('input', function() {
+    var q = this.value.toLowerCase();
+    document.querySelectorAll('tr[data-searchable]').forEach(function(row) {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+}
+</script>{% endblock %}

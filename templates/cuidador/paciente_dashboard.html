@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import avatar %}
 {% block title %}Paciente — Dashboard{% endblock %}
 {% block page_title %}Dashboard del Paciente{% endblock %}
 {% block content %}
@@ -9,7 +10,7 @@
 <!-- Header paciente -->
 <div class="card" style="margin-bottom:20px;">
   <div class="card-body" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-    <div class="patient-avatar" style="width:48px;height:48px;font-size:16px;">{{ paciente.nombre[:2].upper() if paciente.nombre else '??' }}</div>
+    {{ avatar(paciente.foto if paciente.foto is defined else '', paciente.nombre, 48) }}
     <div style="flex:1;">
       <div style="font-weight:700;font-size:17px;">{{ paciente.nombre }}</div>
       {% if paciente.diagnosticos %}

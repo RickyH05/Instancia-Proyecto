@@ -1,0 +1,23 @@
+{% macro avatar(foto, nombre='', tamano=40) %}
+{%- set sz = tamano -%}
+{%- set initials = (nombre[:2].upper() if nombre else '??') -%}
+{%- if foto and foto != '' -%}
+  {%- if foto.startswith('default_') -%}
+    {%- set src = url_for('static', filename='img/avatars/' ~ foto) -%}
+  {%- else -%}
+    {%- set src = url_for('static', filename='img/' ~ foto) -%}
+  {%- endif -%}
+  <img src="{{ src }}" alt="{{ nombre }}"
+    style="width:{{ sz }}px;height:{{ sz }}px;border-radius:50%;object-fit:cover;flex-shrink:0;"
+    onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+  <div class="patient-avatar"
+    style="width:{{ sz }}px;height:{{ sz }}px;font-size:{{ (sz * 0.35)|int }}px;display:none;flex-shrink:0;">
+    {{ initials }}
+  </div>
+{%- else -%}
+  <div class="patient-avatar"
+    style="width:{{ sz }}px;height:{{ sz }}px;font-size:{{ (sz * 0.35)|int }}px;flex-shrink:0;">
+    {{ initials }}
+  </div>
+{%- endif -%}
+{% endmacro %}

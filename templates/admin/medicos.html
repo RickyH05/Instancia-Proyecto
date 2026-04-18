@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import avatar %}
 {% block title %}Medicos{% endblock %}
 {% block page_title %}Medicos{% endblock %}
 {% block content %}
@@ -21,13 +22,15 @@
   <div class="table-wrap">
     <table>
       <thead><tr>
+        <th style="width:44px;"></th>
         <th>Nombre</th><th>Cedula</th><th>Correo</th><th>Estado</th>
         <th style="text-align:right;">Acciones</th>
       </tr></thead>
       <tbody>
         {% for m in medicos %}
-        {# m: (0=id, 1=nombre, 2=apellido_p, 3=apellido_m, 4=cedula, 5=email, 6=activo) #}
+        {# m: (0=id, 1=nombre, 2=apellido_p, 3=apellido_m, 4=cedula, 5=email, 6=activo, 7=foto_perfil) #}
         <tr data-searchable>
+          <td>{{ avatar(m[7], m[1] ~ ' ' ~ m[2], 34) }}</td>
           <td style="font-weight:500;">Dr(a). {{ m[1] }} {{ m[2] }} {{ m[3] }}</td>
           <td style="font-family:monospace;font-size:12px;">{{ m[4] }}</td>
           <td style="font-size:13px;color:#5D6D7E;">{{ m[5] }}</td>
@@ -61,7 +64,7 @@
         <i data-lucide="x" style="width:16px;height:16px;"></i>
       </button>
     </div>
-    <form method="POST" action="{{ url_for('admin_medicos') }}">
+    <form method="POST" action="{{ url_for('admin_medicos') }}" enctype="multipart/form-data">
       <input type="hidden" id="m-acc" name="acc" value="I">
       <input type="hidden" id="m-id" name="id_medico" value="">
       <div class="modal-body">
@@ -86,6 +89,11 @@
         <div class="form-group">
           <label class="form-label">Correo electronico *</label>
           <input class="form-control" id="m-email" name="email" type="text" placeholder="medico@medinfc.com"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Foto de perfil</label>
+          <input class="form-control" type="file" name="foto" accept="image/png,image/jpeg,image/webp"/>
+          <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">PNG, JPG o WEBP · máx. 2 MB</div>
         </div>
       </div>
       <div class="modal-footer">

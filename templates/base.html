@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% from "_macros.html" import avatar %}
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -36,12 +37,13 @@
       <div class="nav-label">Gestion</div>
       <a href="{{ url_for('admin_medicos') }}"        class="nav-item"><i data-lucide="stethoscope"    class="nav-icon"></i>Medicos</a>
       <a href="{{ url_for('admin_cuidadores') }}"     class="nav-item"><i data-lucide="users"          class="nav-icon"></i>Cuidadores</a>
+      <a href="{{ url_for('admin_pacientes') }}"      class="nav-item"><i data-lucide="user"           class="nav-icon"></i>Pacientes</a>
       <a href="{{ url_for('admin_medicamentos') }}"   class="nav-item"><i data-lucide="pill"           class="nav-icon"></i>Medicamentos</a>
       <a href="{{ url_for('admin_diagnosticos') }}"   class="nav-item"><i data-lucide="heart-pulse"    class="nav-icon"></i>Diagnosticos</a>
       <a href="{{ url_for('admin_especialidades') }}" class="nav-item"><i data-lucide="graduation-cap" class="nav-icon"></i>Especialidades</a>
       <div class="nav-label">IoT</div>
       <a href="{{ url_for('admin_gps') }}"     class="nav-item"><i data-lucide="smartphone" class="nav-icon"></i>Dispositivos GPS</a>
-      <a href="{{ url_for('admin_beacons') }}" class="nav-item"><i data-lucide="radio"      class="nav-icon"></i>Beacons BLE</a>
+      <a href="{{ url_for('admin_beacon') }}" class="nav-item"><i data-lucide="radio"      class="nav-icon"></i>Beacons BLE</a>
       <div class="nav-label">Sistema</div>
       <a href="{{ url_for('admin_auditoria') }}"     class="nav-item"><i data-lucide="clipboard-list" class="nav-icon"></i>Auditoria</a>
       <a href="{{ url_for('admin_configuracion') }}" class="nav-item"><i data-lucide="settings"       class="nav-icon"></i>Configuracion</a>
@@ -67,8 +69,10 @@
 
   <div style="padding:12px;border-top:1px solid rgba(255,255,255,.12);">
     <div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:4px;">
-      <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;flex-shrink:0;">
-        {{ session.nombre[:2].upper() }}
+      {# Avatar en sidebar: fondo oscuro — el <img> se muestra directamente; #}
+      {# el fallback (.patient-avatar) queda sobre azul oscuro: se ve bien con su fondo propio. #}
+      <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;background:rgba(255,255,255,.18);">
+        {{ avatar(session.get('foto_perfil',''), session.nombre, 36) }}
       </div>
       <div>
         <div style="font-size:13px;font-weight:600;color:white;">{{ session.nombre }}</div>
@@ -104,9 +108,7 @@
           <div style="font-size:14px;font-weight:500;color:#2C3E50;">{{ session.nombre }}</div>
           <div style="font-size:12px;color:#5D6D7E;">{{ session.rol|capitalize }}</div>
         </div>
-        <div style="width:36px;height:36px;border-radius:50%;background:#1B4F72;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;">
-          {{ session.nombre[:2].upper() }}
-        </div>
+        {{ avatar(session.get('foto_perfil',''), session.nombre, 36) }}
       </div>
     </div>
   </header>

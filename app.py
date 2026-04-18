@@ -1,17 +1,49 @@
 import os
+import uuid
 from datetime import date
 from functools import wraps
 
 import bcrypt
-import psycopg2
+import psycopg
 from dotenv import load_dotenv
 from flask import Flask, flash, redirect, render_template, request, session, url_for
+from werkzeug.utils import secure_filename
 
 load_dotenv()
 
 app = Flask(__name__)
 app.jinja_env.filters['enumerate'] = enumerate
 app.secret_key = os.environ["SECRET_KEY"]
+
+# Asegurar que el directorio de uploads exista al iniciar
+_UPLOAD_DIR = os.path.join(app.root_path, "static", "img", "uploads")
+os.makedirs(_UPLOAD_DIR, exist_ok=True)
+
+_ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+_MAX_FOTO_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+def guardar_foto_perfil(file_storage):
+    """Valida y guarda un archivo de foto de perfil.
+
+    Retorna la ruta relativa para guardar en BD (ej. 'uploads/abc123.jpg'),
+    o None si no se subió archivo o la validación falla (se llama flash).
+    """
+    if not file_storage or file_storage.filename == "":
+        return None
+    ext = file_storage.filename.rsplit(".", 1)[-1].lower() if "." in file_storage.filename else ""
+    if ext not in _ALLOWED_EXTENSIONS:
+        flash("Formato de imagen no permitido. Usa PNG, JPG, JPEG o WEBP.", "danger")
+        return None
+    file_storage.seek(0, 2)
+    size = file_storage.tell()
+    file_storage.seek(0)
+    if size > _MAX_FOTO_BYTES:
+        flash("La imagen supera el límite de 2 MB.", "danger")
+        return None
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    file_storage.save(os.path.join(_UPLOAD_DIR, filename))
+    return f"uploads/{filename}"
 
 
 @app.context_processor
@@ -43,7 +75,7 @@ def inject_alert_count():
 # ─── Conexión a la base de datos ────────────────────────────────────────────
 
 def get_db():
-    return psycopg2.connect(
+    return psycopg.connect(
         host=os.environ["DB_HOST"],
         dbname=os.environ["DB_NAME"],
         user=os.environ["DB_USER"],
@@ -93,10 +125,11 @@ def login():
         admin_email = os.environ.get("ADMIN_EMAIL", "")
         admin_hash  = os.environ.get("ADMIN_PASSWORD_HASH", "")
         if email == admin_email and admin_hash and bcrypt.checkpw(password.encode(), admin_hash.encode()):
-            session["user_id"] = 0
-            session["rol"]     = "admin"
-            session["id_rol"]  = None
-            session["nombre"]  = "Administrador"
+            session["user_id"]    = 0
+            session["rol"]        = "admin"
+            session["id_rol"]     = None
+            session["nombre"]     = "Administrador"
+            session["foto_perfil"] = "default_medico.png"
             return redirect(url_for("dashboard"))
 
         # ── Login normal contra tabla usuario ────────────────────────────────
@@ -111,7 +144,12 @@ def login():
                            WHEN 'medico'   THEN m.nombre || ' ' || m.apellido_p
                            WHEN 'cuidador' THEN c.nombre || ' ' || c.apellido_p
                            ELSE u.email
-                       END AS nombre
+                       END AS nombre,
+                       CASE u.rol_usuario
+                           WHEN 'medico'   THEN COALESCE(m.foto_perfil, 'default_medico.png')
+                           WHEN 'cuidador' THEN COALESCE(c.foto_perfil, 'default_cuidador.png')
+                           ELSE 'default_medico.png'
+                       END AS foto_perfil
                 FROM usuario u
                 LEFT JOIN medico   m ON m.id_medico   = u.id_medico
                 LEFT JOIN cuidador c ON c.id_cuidador = u.id_cuidador
@@ -121,7 +159,7 @@ def login():
 
             login_ok = False
             if row:
-                id_usuario, stored_hash, rol, id_rol, nombre = row
+                id_usuario, stored_hash, rol, id_rol, nombre, foto_perfil = row
                 if bcrypt.checkpw(password.encode(), stored_hash.encode()):
                     login_ok = True
 
@@ -138,10 +176,11 @@ def login():
             return render_template("login.html")
 
         if login_ok:
-            session["user_id"] = id_usuario
-            session["rol"]     = rol
-            session["id_rol"]  = id_rol
-            session["nombre"]  = nombre
+            session["user_id"]    = id_usuario
+            session["rol"]        = rol
+            session["id_rol"]     = id_rol
+            session["nombre"]     = nombre
+            session["foto_perfil"] = foto_perfil
             return redirect(url_for("dashboard"))
 
         flash("Credenciales incorrectas.", "danger")
@@ -256,7 +295,7 @@ def admin_medicos():
         am      = request.form.get("apellido_m","").strip() or None
         ced     = request.form.get("cedula",    "").strip() or None
         email   = request.form.get("email",     "").strip() or None
-        foto    = request.form.get("foto",      "").strip() or None
+        foto    = guardar_foto_perfil(request.files.get("foto"))
 
         try:
             conn, cur = _admin_db()
@@ -266,6 +305,7 @@ def admin_medicos():
                     [nom, ap, am, ced, email, foto],
                 )
             elif acc == "U":
+                # foto=None → COALESCE en SP mantiene la foto actual
                 cur.execute(
                     "CALL sp_gestion_medico('U', %s, NULL, NULL, %s, %s, %s, %s, %s, %s)",
                     [id_med, nom, ap, am, ced, email, foto],
@@ -292,7 +332,8 @@ def admin_medicos():
         cur.execute("""
             SELECT id_medico, nombre, apellido_p, COALESCE(apellido_m,'') AS apellido_m,
                    COALESCE(cedula_profesional,'') AS cedula,
-                   COALESCE(email,'') AS email, activo
+                   COALESCE(email,'') AS email, activo,
+                   COALESCE(foto_perfil,'') AS foto_perfil
             FROM medico ORDER BY apellido_p, nombre
         """)
         medicos = cur.fetchall()
@@ -320,7 +361,7 @@ def admin_cuidadores():
         tipo   = request.form.get("tipo",      "").strip() or None   # 'formal'|'informal'
         tel    = request.form.get("telefono",  "").strip() or None
         email  = request.form.get("email",     "").strip() or None
-        foto   = request.form.get("foto",      "").strip() or None
+        foto   = guardar_foto_perfil(request.files.get("foto"))
 
         try:
             conn, cur = _admin_db()
@@ -330,6 +371,7 @@ def admin_cuidadores():
                     [nom, ap, am, tipo, tel, email, foto],
                 )
             elif acc == "U":
+                # foto=None → COALESCE en SP mantiene la foto actual
                 cur.execute(
                     "CALL sp_gestion_cuidador('U', %s, NULL, NULL, %s, %s, %s, %s, %s, %s, %s)",
                     [id_c, nom, ap, am, tipo, tel, email, foto],
@@ -356,7 +398,8 @@ def admin_cuidadores():
         cur.execute("""
             SELECT id_cuidador, nombre, apellido_p, COALESCE(apellido_m,'') AS apellido_m,
                    tipo_cuidador, COALESCE(telefono,'') AS telefono,
-                   COALESCE(email,'') AS email, activo
+                   COALESCE(email,'') AS email, activo,
+                   COALESCE(foto_perfil,'') AS foto_perfil
             FROM cuidador ORDER BY apellido_p, nombre
         """)
         cuidadores = cur.fetchall()
@@ -383,7 +426,7 @@ def admin_pacientes():
         am    = request.form.get("apellido_m","").strip() or None
         nac   = request.form.get("fecha_nac", "").strip() or None
         curp  = request.form.get("curp",      "").strip() or None
-        foto  = request.form.get("foto",      "").strip() or None
+        foto  = guardar_foto_perfil(request.files.get("foto"))
 
         try:
             conn, cur = _admin_db()
@@ -393,6 +436,7 @@ def admin_pacientes():
                     [nom, ap, am, nac, curp, foto],
                 )
             elif acc == "U":
+                # foto=None → COALESCE en SP mantiene la foto actual
                 cur.execute(
                     "CALL sp_gestion_paciente('U', %s, NULL, NULL, %s, %s, %s, %s, %s, %s)",
                     [id_p, nom, ap, am, nac, curp, foto],
@@ -412,22 +456,84 @@ def admin_pacientes():
 
         return redirect(url_for("admin_pacientes"))
 
-    # GET — SELECT directo: no existe view para listar pacientes (excepción aceptada)
+    # GET — SELECT directo (no hay view para listar pacientes — excepción aceptada)
     pacientes = []
+    diagnosticos = []
+    cuidadores   = []
     try:
         conn, cur = _admin_db()
         cur.execute("""
-            SELECT id_paciente,
-                   nombre || ' ' || apellido_p || ' ' || COALESCE(apellido_m,'') AS nombre_completo,
-                   curp, fecha_nacimiento, activo
+            SELECT id_paciente, nombre, apellido_p,
+                   COALESCE(apellido_m,'') AS apellido_m,
+                   COALESCE(curp,'') AS curp,
+                   fecha_nacimiento, activo,
+                   COALESCE(foto_perfil,'') AS foto_perfil
             FROM paciente
             ORDER BY apellido_p, nombre
         """)
         pacientes = cur.fetchall()
+
+        cur.execute("SELECT id_diagnostico, descripcion FROM diagnostico ORDER BY descripcion")
+        diagnosticos = cur.fetchall()
+
+        cur.execute("""
+            SELECT id_cuidador,
+                   nombre || ' ' || apellido_p || ' ' || COALESCE(apellido_m,'') AS nombre_completo
+            FROM cuidador ORDER BY apellido_p, nombre
+        """)
+        cuidadores = cur.fetchall()
+
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar pacientes: {e}", "danger")
-    return render_template("admin/pacientes.html", pacientes=pacientes)
+    return render_template("admin/pacientes.html",
+                           pacientes=pacientes,
+                           diagnosticos=diagnosticos,
+                           cuidadores=cuidadores)
+
+
+# ─── Asignaciones rápidas desde la vista de pacientes ───────────────────────
+
+@app.route("/admin/pacientes/<int:id_pac>/asignar-diagnostico", methods=["POST"])
+@login_requerido
+@rol_requerido("admin")
+def admin_paciente_asignar_diagnostico(id_pac):
+    id_diag = request.form.get("id_diagnostico", type=int)
+    if not id_diag:
+        flash("Selecciona un diagnóstico.", "danger")
+        return redirect(url_for("admin_pacientes"))
+    try:
+        conn, cur = _admin_db()
+        cur.execute("CALL sp_asignar_diagnostico(%s, %s, NULL, NULL)", [id_pac, id_diag])
+        p_ok, p_msg = cur.fetchone()
+        conn.commit()
+        cur.close(); conn.close()
+        flash(p_msg, "success" if p_ok == 1 else "danger")
+    except Exception as e:
+        flash(f"Error: {e}", "danger")
+    return redirect(url_for("admin_pacientes"))
+
+
+@app.route("/admin/pacientes/<int:id_pac>/asignar-cuidador", methods=["POST"])
+@login_requerido
+@rol_requerido("admin")
+def admin_paciente_asignar_cuidador(id_pac):
+    id_cuid  = request.form.get("id_cuidador", type=int)
+    principal = request.form.get("principal") == "1"
+    if not id_cuid:
+        flash("Selecciona un cuidador.", "danger")
+        return redirect(url_for("admin_pacientes"))
+    try:
+        conn, cur = _admin_db()
+        cur.execute("CALL sp_asignar_cuidador(%s, %s, NULL, NULL, %s)",
+                    [id_pac, id_cuid, principal])
+        p_ok, p_msg = cur.fetchone()
+        conn.commit()
+        cur.close(); conn.close()
+        flash(p_msg, "success" if p_ok == 1 else "danger")
+    except Exception as e:
+        flash(f"Error: {e}", "danger")
+    return redirect(url_for("admin_pacientes"))
 
 
 # ═══════════════════════════════════════════════════════
@@ -1276,6 +1382,15 @@ def doctor_pacientes():
                     "ini": f_ini, "fin": f_fin,
                 })
 
+        if pac_map:
+            cur.execute(
+                "SELECT id_paciente, foto_perfil FROM paciente WHERE id_paciente = ANY(%s)",
+                [list(pac_map.keys())],
+            )
+            for pid, fp in cur.fetchall():
+                if pid in pac_map:
+                    pac_map[pid]["foto"] = fp or ""
+
         pacientes = list(pac_map.values())
         cur.close()
         conn.close()
@@ -1295,12 +1410,13 @@ def doctor_paciente_nuevo():
     am   = request.form.get("apellido_m","").strip() or None
     curp = request.form.get("curp",      "").strip() or None
     nac  = request.form.get("fecha_nac", "").strip() or None
+    foto = guardar_foto_perfil(request.files.get("foto"))
     try:
         conn = get_db()
         cur  = conn.cursor()
         cur.execute(
-            "CALL sp_gestion_paciente('I', NULL, NULL, NULL, %s, %s, %s, %s, %s, NULL)",
-            [nom, ap, am, nac, curp],
+            "CALL sp_gestion_paciente('I', NULL, NULL, NULL, %s, %s, %s, %s, %s, %s)",
+            [nom, ap, am, nac, curp, foto],
         )
         _, p_ok, p_msg = cur.fetchone()
         conn.commit()
@@ -1345,7 +1461,13 @@ def doctor_paciente_perfil(id):
                 "cuidador":     r[8] or "",
                 "medicamentos": r[9] or "",
                 "pct":          pct_gauge,
+                "foto":         "",
             }
+            cur.execute(
+                "SELECT foto_perfil FROM paciente WHERE id_paciente = %s", [r[0]]
+            )
+            fp = cur.fetchone()
+            paciente["foto"] = fp[0] or "" if fp else ""
 
         # ── v_historial_tomas ────────────────────────────────────────────────
         # Cols: id_evento, timestamp_lectura, uid_nfc, resultado, desfase_min,
@@ -1749,6 +1871,68 @@ def doctor_asignar_cuidador(id):
     return redirect(url_for("doctor_paciente_perfil", id=id))
 
 
+@app.route("/doctor/recetas/nueva", methods=["POST"])
+@login_requerido
+@rol_requerido("medico")
+def doctor_receta_desde_lista():
+    """Crea una receta desde la pantalla /doctor/recetas (el paciente viene en el form body)."""
+    id_medico  = session["id_rol"]
+    id_pac     = request.form.get("id_paciente", type=int)
+    f_ini      = request.form.get("fecha_inicio", "").strip()
+    f_fin      = request.form.get("fecha_fin", "").strip()
+    f_emi      = request.form.get("fecha_emision", f_ini).strip()
+    med_ids    = request.form.getlist("med_id[]")
+    dosis_lst  = request.form.getlist("dosis[]")
+    freq_lst   = request.form.getlist("frecuencia[]")
+    tol_lst    = request.form.getlist("tolerancia[]")
+    hora_lst   = request.form.getlist("hora[]")
+    unidad_lst = request.form.getlist("unidad[]")
+
+    if not id_pac:
+        flash("Selecciona un paciente.", "danger")
+        return redirect(url_for("doctor_recetas"))
+    if not f_ini or not f_fin:
+        flash("Las fechas de inicio y fin son obligatorias.", "danger")
+        return redirect(url_for("doctor_recetas"))
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute(
+            "CALL sp_crear_receta(NULL, NULL, NULL, %s, %s, %s, %s, %s)",
+            [id_pac, id_medico, f_emi, f_ini, f_fin],
+        )
+        p_id_rx, p_ok, p_msg = cur.fetchone()
+        conn.commit()
+        if p_ok != 1:
+            flash(p_msg, "danger")
+            cur.close(); conn.close()
+            return redirect(url_for("doctor_recetas"))
+        for i, mid in enumerate(med_ids):
+            if not mid:
+                continue
+            try:
+                dosis  = int(dosis_lst[i])
+                freq   = int(freq_lst[i])
+                tol    = int(tol_lst[i])
+                hora   = hora_lst[i]
+                unidad = int(unidad_lst[i])
+            except (IndexError, ValueError):
+                continue
+            cur.execute(
+                "CALL sp_agregar_receta_med(NULL, NULL, NULL, %s, %s, %s, %s, %s, %s, %s)",
+                [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
+            )
+            _, p_ok_m, p_msg_m = cur.fetchone()
+            conn.commit()
+            if p_ok_m != 1:
+                flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
+        cur.close(); conn.close()
+        flash("Receta creada correctamente.", "success")
+    except Exception as e:
+        flash(f"Error al crear la receta: {e}", "danger")
+    return redirect(url_for("doctor_recetas"))
+
+
 @app.route("/doctor/recetas")
 @login_requerido
 @rol_requerido("medico")
@@ -1957,11 +2141,45 @@ def cuidador_home():
         row_al = cur.fetchone()
         stats["alertas_pend"] = row_al[0] if row_al else 0
 
+        # ── foto_perfil de cada paciente ─────────────────────────────────────
+        if pacientes:
+            cur.execute(
+                "SELECT id_paciente, foto_perfil FROM paciente WHERE id_paciente = ANY(%s)",
+                [list(pacientes.keys())],
+            )
+            for pid, fp in cur.fetchall():
+                if pid in pacientes:
+                    pacientes[pid]["foto"] = fp or ""
+
+        # ── GPS del cuidador (resumen para home) ─────────────────────────────
+        gps_resumen = None
+        cur.execute("""
+            SELECT g.imei, g.modelo, g.activo,
+                   u.latitud, u.longitud, u.timestamp_ubicacion
+            FROM gps_imei g
+            LEFT JOIN ubicacion_gps u ON u.id_gps = g.id_gps
+            WHERE g.id_cuidador = %s AND g.activo = TRUE
+            ORDER BY u.timestamp_ubicacion DESC NULLS LAST
+            LIMIT 1
+        """, [id_cuidador])
+        gps_row = cur.fetchone()
+        if gps_row:
+            imei, modelo, activo, lat, lon, ts_ub = gps_row
+            gps_resumen = {
+                "imei":   imei,
+                "modelo": modelo,
+                "activo": activo,
+                "lat":    lat,
+                "lon":    lon,
+                "ts":     str(ts_ub)[11:16] if ts_ub else None,
+            }
+
         cur.close()
         conn.close()
 
     except Exception as e:
         flash(f"Error al cargar el dashboard: {e}", "danger")
+        gps_resumen = None
 
     lista_pacientes = list(pacientes.values())
     return render_template(
@@ -1969,6 +2187,7 @@ def cuidador_home():
         pacientes=lista_pacientes,
         stats=stats,
         fecha_hoy=fecha_hoy,
+        gps_resumen=gps_resumen,
     )
 
 
@@ -2026,6 +2245,10 @@ def cuidador_paciente(id):
             r = perf_rows[0]
             paciente["nombre"]       = f"{r[1]} {r[2]} {r[3]}"
             paciente["diagnosticos"] = r[7] or ""
+
+        cur.execute("SELECT foto_perfil FROM paciente WHERE id_paciente = %s", [id])
+        fp = cur.fetchone()
+        paciente["foto"] = fp[0] or "" if fp else ""
 
         cur.close()
         conn.close()
@@ -2240,15 +2463,16 @@ def cuidador_beacon(id):
         cur  = conn.cursor()
 
         cur.execute("""
-            SELECT nombre, apellido_p, COALESCE(apellido_m,'')
+            SELECT nombre, apellido_p, COALESCE(apellido_m,''), foto_perfil
             FROM paciente WHERE id_paciente = %s
         """, [id])
         row = cur.fetchone()
         if row:
-            nom, ap, am = row
+            nom, ap, am, fp = row
             paciente = {
                 "nombre":    f"{nom} {ap} {am}".strip(),
                 "iniciales": (nom[0] + ap[0]).upper(),
+                "foto":      fp or "",
             }
 
         cur.execute("""
