@@ -318,4 +318,4 @@ Tu entregable:
 - Helper `call_sp_rep` y `rows_to_dicts` definidos al principio de tu sección
 - `CustomJSONProvider` registrado
 - `openpyxl` agregado a `requirements.txt` si no estaba
-- Ningún template nuevo necesario (la exportación devuelve archivos)
+- Ningún template nuevo necesario (la exportación devuelve archivos)flask run

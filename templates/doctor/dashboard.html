@@ -83,25 +83,39 @@
   <!-- Adherencia pacientes -->
   <div class="card">
     <div class="card-header"><h3>Adherencia pacientes</h3></div>
-    <div class="card-body">
-      {% for p in adherencia %}
-      {% set adh = p.pct|int %}
-      <div style="margin-bottom:14px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-          <span style="font-size:13px;font-weight:500;">{{ p.nombre }}</span>
-        </div>
-        <div class="adherence-bar">
-          <div class="adherence-track">
-            <div class="adherence-fill" data-value="{{ adh }}"></div>
-          </div>
-          <span class="adherence-label" style="color:{% if adh >= 80 %}#1ABC9C{% elif adh >= 50 %}#F39C12{% else %}#E74C3C{% endif %};">{{ adh }}%</span>
-        </div>
-      </div>
+    <div class="card-body" style="padding:8px;">
+      {% if adherencia %}
+      <div id="chart_dash_adh" style="height:{{ [adherencia|length * 36, 160]|max }}px;"></div>
       {% else %}
       <p style="font-size:13px;color:#9CA3AF;">Sin datos de adherencia.</p>
-      {% endfor %}
+      {% endif %}
     </div>
   </div>
 </div>
 {% endblock %}
-{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}
+{% block scripts %}
+<script>
+lucide.createIcons();
+{% if adherencia %}
+Highcharts.chart('chart_dash_adh', {
+  chart: { type: 'bar', backgroundColor: 'transparent', margin: [0,0,20,0], spacing: [0,0,0,0] },
+  title: null,
+  xAxis: { categories: [{% for p in adherencia %}'{{ p.nombre }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    labels: { style: { fontSize: '11px', color: '#5D6D7E' } }, lineWidth: 0, tickWidth: 0 },
+  yAxis: { min: 0, max: 100, title: null, labels: { enabled: false }, gridLineWidth: 0 },
+  tooltip: { valueSuffix: '%', style: { fontSize: '12px' } },
+  plotOptions: { bar: { borderRadius: 3, dataLabels: { enabled: true, format: '{y}%',
+    style: { fontSize: '11px', fontWeight: '600', textOutline: 'none' } } } },
+  legend: { enabled: false },
+  series: [{
+    name: 'Adherencia',
+    data: [{% for p in adherencia %}
+      { y: {{ p.pct|float|round|int if p.pct else 0 }},
+        color: '{% set v = p.pct|float|round|int if p.pct else 0 %}{% if v >= 80 %}#1ABC9C{% elif v >= 50 %}#F39C12{% else %}#E74C3C{% endif %}' }{% if not loop.last %},{% endif %}
+    {% endfor %}]
+  }],
+  credits: { enabled: false }
+});
+{% endif %}
+</script>
+{% endblock %}

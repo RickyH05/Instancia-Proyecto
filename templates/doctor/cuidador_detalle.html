@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Detalle Cuidador{% endblock %}
+{% block page_title %}Detalle del Cuidador{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('doctor_paciente_perfil', id=id_pac) }}"
+   class="btn btn-ghost btn-sm" style="margin-bottom:16px;display:inline-flex;align-items:center;gap:6px;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver al perfil
+</a>
+
+{% if cuidador %}
+<!-- Header cuidador -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-body">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div style="width:56px;height:56px;border-radius:50%;background:#1B4F72;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:white;flex-shrink:0;">
+        {{ cuidador.nombre[:2].upper() }}
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:18px;font-weight:700;color:#2C3E50;margin-bottom:4px;">{{ cuidador.nombre }}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          {% if cuidador.tipo == 'formal' %}
+          <span class="badge badge-blue">Formal</span>
+          {% else %}
+          <span class="badge badge-gray">Informal</span>
+          {% endif %}
+          {% if vinculo %}
+            {% if vinculo[2] %}
+            <span class="badge badge-green">Principal</span>
+            {% else %}
+            <span class="badge badge-gray">Apoyo</span>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:#5D6D7E;">
+        {% if cuidador.telefono %}
+        <div style="display:flex;align-items:center;gap:6px;">
+          <i data-lucide="phone" style="width:14px;height:14px;"></i>
+          {{ cuidador.telefono }}
+        </div>
+        {% endif %}
+        {% if cuidador.email %}
+        <div style="display:flex;align-items:center;gap:6px;">
+          <i data-lucide="mail" style="width:14px;height:14px;"></i>
+          {{ cuidador.email }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Horarios -->
+<div class="card">
+  <div class="card-header">
+    <h3><i data-lucide="clock" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px;"></i>Turnos registrados</h3>
+  </div>
+  <div class="card-body">
+    {% if horarios %}
+    {# cols: id_cuidador_horario[0], dia_semana[1], hora_inicio[2], hora_fin[3], cuidador[4], paciente[5] #}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Día</th>
+            <th>Hora inicio</th>
+            <th>Hora fin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in horarios %}
+          <tr>
+            <td style="font-weight:600;text-transform:capitalize;">{{ h[1] }}</td>
+            <td style="font-family:monospace;">{{ h[2] }}</td>
+            <td style="font-family:monospace;">{{ h[3] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:32px;color:#9CA3AF;">
+      <i data-lucide="clock" style="width:32px;height:32px;opacity:0.35;margin-bottom:8px;"></i>
+      <p style="font-size:14px;">Sin turnos registrados</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<div class="card"><div class="card-body">
+  <p style="color:#9CA3AF;font-size:14px;text-align:center;padding:32px;">No se encontró información del cuidador.</p>
+</div></div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

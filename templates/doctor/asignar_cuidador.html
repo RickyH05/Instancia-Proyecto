@@ -2,7 +2,150 @@
 {% block title %}Asignar Cuidador{% endblock %}
 {% block page_title %}Asignar Cuidador{% endblock %}
 {% block content %}
-<div class="page-header"><div><h1>Asignar Cuidador</h1><p>Asignar cuidador</p></div></div>
-<div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">👥</div><p>Asignar Cuidador</p><small>Contenido se conectará con BD.</small></div></div></div>
+
+<a href="{{ url_for('doctor_paciente_perfil', id=id) }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;display:inline-flex;align-items:center;gap:6px;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver al perfil
+</a>
+
+<div class="page-header" style="margin-bottom:20px;">
+  <div>
+    <h1>Asignar Cuidador</h1>
+    <p style="color:#5D6D7E;font-size:14px;">Paciente: <strong>{{ pac_nombre }}</strong></p>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+
+  <!-- ── PASO 1: Asignar cuidador ── -->
+  <div class="card">
+    <div class="card-header">
+      <h3><i data-lucide="user-plus" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px;"></i>Asignar cuidador</h3>
+    </div>
+    <div class="card-body">
+      {% if cuidadores %}
+      <form method="POST" action="{{ url_for('doctor_asignar_cuidador_post', id=id) }}">
+        <div class="form-group">
+          <label class="form-label">Cuidador *</label>
+          <select name="id_cuidador" class="form-control" required id="sel-cuidador">
+            <option value="">— Selecciona un cuidador —</option>
+            {% for c in cuidadores %}
+            <option value="{{ c[0] }}">{{ c[1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="margin-top:12px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+            <input type="checkbox" name="es_principal" value="1" style="width:16px;height:16px;"/>
+            <span>Es cuidador principal</span>
+          </label>
+          <small style="color:#9CA3AF;font-size:12px;margin-top:4px;display:block;">
+            Si ya existe un principal activo, será desactivado automáticamente.
+          </small>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:8px;">
+          <i data-lucide="save" style="width:15px;height:15px;"></i> Guardar asignación
+        </button>
+      </form>
+      {% else %}
+      <p style="color:#9CA3AF;font-size:14px;">No hay cuidadores activos disponibles.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── PASO 2: Horarios ── -->
+  <div class="card">
+    <div class="card-header">
+      <h3><i data-lucide="clock" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px;"></i>Horarios por cuidador</h3>
+    </div>
+    <div class="card-body">
+
+      {% if horarios_por_cuidador %}
+      <!-- Agregar turno -->
+      <form method="POST" action="{{ url_for('doctor_horario_agregar', id=id) }}" style="margin-bottom:20px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end;">
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" style="font-size:12px;">Cuidador</label>
+            <select name="id_cuidador" class="form-control" required>
+              {% for g in horarios_por_cuidador %}
+              <option value="{{ g.id_cuidador }}">{{ g.nombre }}{% if g.es_principal %} (Principal){% else %} (Apoyo){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:12px;">Día</label>
+            <select name="dia_semana" class="form-control" required>
+              {% for dia in ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'] %}
+              <option value="{{ dia }}">{{ dia|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:12px;">Hora inicio</label>
+            <input type="time" name="hora_inicio" class="form-control" required/>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:12px;">Hora fin</label>
+            <input type="time" name="hora_fin" class="form-control" required/>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="margin-top:10px;">
+          <i data-lucide="plus" style="width:13px;height:13px;"></i> Agregar turno
+        </button>
+      </form>
+      {% endif %}
+
+      <!-- Turnos agrupados por cuidador -->
+      {% if horarios_por_cuidador %}
+      <div style="border-top:1px solid #E8ECF0;padding-top:14px;">
+        {% for grupo in horarios_por_cuidador %}
+        <div style="margin-bottom:18px;">
+          <!-- Encabezado del grupo -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="font-size:13px;font-weight:600;color:#2C3E50;">{{ grupo.nombre }}</span>
+            {% if grupo.es_principal %}
+            <span class="badge badge-green" style="font-size:10px;">Principal</span>
+            {% else %}
+            <span class="badge badge-gray" style="font-size:10px;">Apoyo</span>
+            {% endif %}
+            <div style="flex:1;height:1px;background:#E8ECF0;margin-left:4px;"></div>
+          </div>
+          <!-- Turnos del cuidador -->
+          {% if grupo.turnos %}
+          {# cols: id_cuidador_horario[0], dia_semana[1], hora_inicio[2], hora_fin[3], cuidador[4], paciente[5] #}
+          {% for h in grupo.turnos %}
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:6px;background:#F4F6F8;margin-bottom:5px;">
+            <div style="font-size:13px;">
+              <span style="font-weight:600;color:#2C3E50;text-transform:capitalize;min-width:72px;display:inline-block;">{{ h[1] }}</span>
+              <span style="color:#5D6D7E;">{{ h[2] }} — {{ h[3] }}</span>
+            </div>
+            <form method="POST" action="{{ url_for('doctor_horario_eliminar', id=id) }}"
+                  onsubmit="return confirm('¿Eliminar este turno?')">
+              <input type="hidden" name="id_horario" value="{{ h[0] }}"/>
+              <button type="submit" class="btn btn-ghost btn-sm" style="color:#E74C3C;padding:4px 8px;">
+                <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+          {% else %}
+          <p style="font-size:12px;color:#9CA3AF;padding-left:4px;">Sin turnos registrados.</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:24px;color:#9CA3AF;">
+        <i data-lucide="clock" style="width:32px;height:32px;opacity:0.4;margin-bottom:8px;"></i>
+        <p style="font-size:13px;">Asigna un cuidador primero para gestionar horarios.</p>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
 {% endblock %}
-{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}
+
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% endblock %}

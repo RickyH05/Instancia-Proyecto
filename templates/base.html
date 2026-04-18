@@ -8,6 +8,10 @@
   <title>{% block title %}MediNFC{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}"/>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <script src="https://code.highcharts.com/modules/solid-gauge.js"></script>
+  {% block head %}{% endblock %}
 </head>
 <body style="background:#F4F6F8;color:#2C3E50;margin:0;padding:0;font-family:'DM Sans',system-ui,sans-serif;">
 

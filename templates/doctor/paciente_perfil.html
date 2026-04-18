@@ -23,17 +23,9 @@
       </div>
       {% endif %}
     </div>
-    {% set adh = paciente.pct|int %}
-    {% set dash = (adh / 100 * 188)|int %}
-    {% set color = '#1ABC9C' if adh >= 80 else ('#F39C12' if adh >= 50 else '#E74C3C') %}
-    <div style="text-align:center;">
-      <svg width="80" height="80" viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r="30" fill="none" stroke="#E8ECF0" stroke-width="7"/>
-        <circle cx="40" cy="40" r="30" fill="none" stroke="{{ color }}" stroke-width="7"
-          stroke-linecap="round" stroke-dasharray="{{ dash }} 188" transform="rotate(-90 40 40)"/>
-        <text x="40" y="45" text-anchor="middle" font-size="14" font-weight="700" fill="{{ color }}">{{ adh }}%</text>
-      </svg>
-      <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">Adherencia</div>
+    <div style="text-align:center;min-width:100px;">
+      <div id="gauge_perfil" style="height:90px;width:110px;"></div>
+      <div style="font-size:12px;color:#5D6D7E;margin-top:-6px;">Adherencia</div>
     </div>
   </div>
 </div>
@@ -156,18 +148,29 @@
         <i data-lucide="plus" style="width:14px;height:14px;"></i> Asignar
       </a>
     </div>
-    {% if paciente.cuidador %}
-    <div style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:14px;">
+    {% if vinculos %}
+    {% for r in vinculos %}
+    {# cols: id_paciente_cuidador[0], id_cuidador[1], es_principal[2], activo[3], cuidador[4] #}
+    <div style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:14px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:36px;height:36px;border-radius:50%;background:#1ABC9C;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0;">
-          {{ paciente.cuidador[:2].upper() }}
+        <div style="width:36px;height:36px;border-radius:50%;background:{% if r[2] %}#1ABC9C{% else %}#9CA3AF{% endif %};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0;">
+          {{ r[4][:2].upper() if r[4] else '?' }}
         </div>
         <div style="flex:1;">
-          <div style="font-weight:500;font-size:14px;color:#2C3E50;">{{ paciente.cuidador }}</div>
+          <a href="{{ url_for('doctor_cuidador_detalle', id_pac=paciente.id, id_cuid=r[1]) }}"
+             style="font-weight:500;font-size:14px;color:#2C3E50;text-decoration:none;">
+            {{ r[4] }}
+          </a>
         </div>
+        {% if r[2] %}
         <span class="badge badge-green">Principal</span>
+        {% else %}
+        <span class="badge badge-gray">Apoyo</span>
+        {% endif %}
+        <i data-lucide="chevron-right" style="width:14px;height:14px;color:#9CA3AF;"></i>
       </div>
     </div>
+    {% endfor %}
     {% else %}
     <p style="font-size:14px;color:#9CA3AF;">Sin cuidador asignado.</p>
     {% endif %}
@@ -284,6 +287,25 @@
 {% block scripts %}
 <script>
 lucide.createIcons();
+{% if paciente.pct is not none %}
+{% set adh_p = paciente.pct|float|round|int %}
+{% set clr_p = '#1ABC9C' if adh_p >= 80 else ('#F39C12' if adh_p >= 50 else '#E74C3C') %}
+Highcharts.chart('gauge_perfil', {
+  chart: { type: 'solidgauge', backgroundColor: 'transparent', height: 90, margin: [0,0,0,0], spacing: [0,0,0,0] },
+  title: null,
+  pane: { center: ['50%','85%'], size: '100%', startAngle: -90, endAngle: 90,
+    background: { backgroundColor: '#EEF2F7', innerRadius: '55%', outerRadius: '100%', shape: 'arc', borderWidth: 0 } },
+  tooltip: { enabled: false },
+  yAxis: { min: 0, max: 100, lineWidth: 0, tickWidth: 0, minorTickInterval: null, labels: { enabled: false } },
+  plotOptions: { solidgauge: { dataLabels: { y: -18, borderWidth: 0, useHTML: true }, rounded: true } },
+  series: [{ name: 'Adherencia', data: [{{ adh_p }}], color: '{{ clr_p }}',
+    dataLabels: { format: '<span style="font-size:13px;font-weight:700;color:{{ clr_p }}">{y}%</span>' } }],
+  credits: { enabled: false }
+});
+{% else %}
+document.getElementById('gauge_perfil').innerHTML =
+  '<div style="height:90px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#9CA3AF;text-align:center;line-height:1.4;">Sin<br>datos</div>';
+{% endif %}
 
 // Tabs
 function showTab(id, btn) {

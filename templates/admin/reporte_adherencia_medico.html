@@ -23,6 +23,14 @@
   </div>
 </form>
 
+{% if rows %}
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-body" style="padding:8px;">
+    <div id="chart_adh_medicos" style="height:300px;"></div>
+  </div>
+</div>
+{% endif %}
+
 <div class="card">
   <div class="table-wrap">
     <table>
@@ -49,14 +57,9 @@
           </td>
           <td style="text-align:center;">
             {% set pct = r[6]|float if r[6] else 0 %}
-            <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
-              <div style="width:80px;height:6px;border-radius:3px;background:#E5E7EB;overflow:hidden;">
-                <div style="width:{{ pct }}%;height:100%;border-radius:3px;background:{% if pct >= 80 %}#1ABC9C{% elif pct >= 60 %}#F39C12{% else %}#E74C3C{% endif %};"></div>
-              </div>
-              <span style="font-size:13px;font-weight:600;color:{% if pct >= 80 %}#16a085{% elif pct >= 60 %}#d68910{% else %}#c0392b{% endif %};">
-                {{ "%.1f"|format(pct) }}%
-              </span>
-            </div>
+            <span style="font-size:13px;font-weight:600;color:{% if pct >= 80 %}#16a085{% elif pct >= 60 %}#d68910{% else %}#c0392b{% endif %};">
+              {{ "%.1f"|format(pct) }}%
+            </span>
           </td>
         </tr>
         {% else %}
@@ -67,4 +70,30 @@
   </div>
 </div>
 {% endblock %}
-{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}
+{% block scripts %}
+<script>
+lucide.createIcons();
+{% if rows %}
+Highcharts.chart('chart_adh_medicos', {
+  chart: { type: 'column', backgroundColor: 'transparent' },
+  title: null,
+  xAxis: { categories: [{% for r in rows %}'{{ r[1] }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    labels: { style: { fontSize: '11px', color: '#5D6D7E' } } },
+  yAxis: { min: 0, max: 100, title: { text: 'Adherencia %', style: { color: '#5D6D7E', fontSize: '11px' } },
+    labels: { format: '{value}%', style: { fontSize: '11px' } } },
+  tooltip: { valueSuffix: '%' },
+  plotOptions: { column: { borderRadius: 4, dataLabels: { enabled: true, format: '{y}%',
+    style: { fontSize: '11px', fontWeight: '600', textOutline: 'none' } } } },
+  legend: { enabled: false },
+  series: [{
+    name: 'Adherencia',
+    data: [{% for r in rows %}
+      { y: {{ r[6]|float|round(1) if r[6] else 0 }},
+        color: '{% set v = r[6]|float if r[6] else 0 %}{% if v >= 80 %}#1ABC9C{% elif v >= 60 %}#F39C12{% else %}#E74C3C{% endif %}' }{% if not loop.last %},{% endif %}
+    {% endfor %}]
+  }],
+  credits: { enabled: false }
+});
+{% endif %}
+</script>
+{% endblock %}
