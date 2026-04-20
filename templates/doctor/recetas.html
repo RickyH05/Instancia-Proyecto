@@ -111,18 +111,30 @@
         </div>
         <div id="meds-list-rec">
           <div class="med-row" style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:10px;">
-            <div style="display:grid;grid-template-columns:1fr 70px 70px 70px 70px 70px auto;gap:8px;align-items:end;">
+            <div style="display:grid;grid-template-columns:2fr 80px 100px 70px 70px 80px 130px auto;gap:8px;align-items:end;">
               <div class="form-group" style="margin:0;">
-                <label class="form-label" style="font-size:11px;">ID Medicamento *</label>
-                <input class="form-control" name="med_id[]" type="number" min="1" placeholder="ID" style="height:38px;font-size:13px;" required/>
+                <label class="form-label" style="font-size:11px;">Medicamento *</label>
+                <select class="form-control" name="med_id[]" style="height:38px;font-size:13px;" required onchange="updateDosisMax(this)">
+                  <option value="">— Seleccionar medicamento —</option>
+                  {% for m in medicamentos %}
+                  <option value="{{ m[0] }}" data-dosis-max="{{ m[2] if m|length > 2 else '' }}">{{ m[1] }}</option>
+                  {% endfor %}
+                </select>
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label" style="font-size:11px;">Dosis</label>
                 <input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/>
+                <small class="dosis-max-hint" style="font-size:10px;color:#9CA3AF;"></small>
               </div>
               <div class="form-group" style="margin:0;">
-                <label class="form-label" style="font-size:11px;">Unidad ID</label>
-                <input class="form-control" name="unidad[]" type="number" min="1" value="1" style="height:38px;font-size:13px;"/>
+                <label class="form-label" style="font-size:11px;">Unidad</label>
+                <select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">
+                  <option value="1" selected>mg</option>
+                  <option value="2">ml</option>
+                  <option value="3">mcg</option>
+                  <option value="4">UI</option>
+                  <option value="5">comp</option>
+                </select>
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label" style="font-size:11px;">Frec. (h)</label>
@@ -135,6 +147,10 @@
               <div class="form-group" style="margin:0;">
                 <label class="form-label" style="font-size:11px;">1ª toma</label>
                 <input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">UID NFC</label>
+                <input class="form-control" name="nfc_uids[]" type="text" placeholder="Ej: A1:B2:C3:D4" style="height:38px;font-size:13px;"/>
               </div>
               <button onclick="this.closest('.med-row').remove()" type="button"
                 style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
@@ -160,31 +176,32 @@
 <script>
 lucide.createIcons();
 
+function updateDosisMax(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  var max = opt ? opt.getAttribute('data-dosis-max') : '';
+  var hint = sel.closest('.med-row').querySelector('.dosis-max-hint');
+  if (hint) hint.textContent = max ? 'Máx: ' + max : '';
+}
+
 function addMedRec() {
-  var list = document.getElementById('meds-list-rec');
-  var div = document.createElement('div');
-  div.className = 'med-row';
-  div.style.cssText = 'border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:10px;';
-  div.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 70px 70px 70px 70px 70px auto;gap:8px;align-items:end;">
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">ID Medicamento *</label>
-        <input class="form-control" name="med_id[]" type="number" min="1" placeholder="ID" style="height:38px;font-size:13px;" required/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Dosis</label>
-        <input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Unidad ID</label>
-        <input class="form-control" name="unidad[]" type="number" min="1" value="1" style="height:38px;font-size:13px;"/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Frec. (h)</label>
-        <input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Tol. (min)</label>
-        <input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">1ª toma</label>
-        <input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/></div>
-      <button onclick="this.closest('.med-row').remove()" type="button"
-        style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
-        <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
-      </button>
-    </div>`;
-  list.appendChild(div);
+  var list   = document.getElementById('meds-list-rec');
+  var first  = list.querySelector('.med-row');
+  var clone  = first.cloneNode(true);
+  // reset select
+  var medSel = clone.querySelector('select[name="med_id[]"]');
+  if (medSel) { medSel.selectedIndex = 0; }
+  // reset unidad to mg
+  var unSel  = clone.querySelector('select[name="unidad[]"]');
+  if (unSel)  { unSel.value = '1'; }
+  // reset inputs
+  clone.querySelectorAll('input[name="dosis[]"]').forEach(function(i){ i.value = '500'; });
+  clone.querySelectorAll('input[name="frecuencia[]"]').forEach(function(i){ i.value = '12'; });
+  clone.querySelectorAll('input[name="tolerancia[]"]').forEach(function(i){ i.value = '30'; });
+  clone.querySelectorAll('input[name="hora[]"]').forEach(function(i){ i.value = '08:00'; });
+  clone.querySelectorAll('input[name="nfc_uids[]"]').forEach(function(i){ i.value = ''; });
+  var hint = clone.querySelector('.dosis-max-hint');
+  if (hint) hint.textContent = '';
+  list.appendChild(clone);
   lucide.createIcons();
 }
 </script>

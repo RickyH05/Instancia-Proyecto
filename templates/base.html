@@ -103,6 +103,7 @@
       </h1>
     </div>
     <div style="display:flex;align-items:center;gap:12px;">
+      <span id="reloj-digital" style="font-family:'Space Grotesk',monospace;font-size:14px;font-weight:600;color:#5D6D7E;letter-spacing:.05em;background:#F4F6F8;padding:5px 10px;border-radius:8px;border:1px solid rgba(0,0,0,.07);">00:00:00</span>
       <button style="width:40px;height:40px;border-radius:8px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#5D6D7E;position:relative;">
         <i data-lucide="bell" style="width:20px;height:20px;"></i>
         <span style="position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#E74C3C;border:2px solid white;"></span>
@@ -179,6 +180,16 @@ document.addEventListener('click', function(e){
     document.body.style.overflow='';
   }
 });
+
+// Reloj digital
+(function(){
+  function tick(){
+    var d=new Date(), pad=function(n){return String(n).padStart(2,'0');};
+    document.getElementById('reloj-digital').textContent=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
 
 // Pills filter
 document.querySelectorAll('.filter-pills .pill').forEach(function(p){

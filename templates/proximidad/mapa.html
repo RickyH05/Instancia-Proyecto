@@ -6,8 +6,8 @@
   <p style="font-size:14px;color:#5D6D7E;">Visualización de beacons BLE y posiciones GPS de cuidadores</p>
 </div>
 
-{% set total_bec = puntos | selectattr('beacon') | list | length %}
-{% set con_gps   = puntos | selectattr('gps') | list | length %}
+{% set total_bec  = puntos | selectattr('beacon.lat') | list | length %}
+{% set con_gps    = puntos | selectattr('cuidadores') | list | length %}
 
 <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;">
   <!-- Mapa Leaflet -->
@@ -65,10 +65,21 @@
         {% for p in puntos %}
         <div style="padding:10px;border-radius:6px;background:#F9FAFB;font-size:13px;">
           <div style="font-weight:600;color:#2C3E50;">{{ p.paciente }}</div>
-          <div style="color:#5D6D7E;font-size:12px;">Cuidador: {{ p.cuidador or '—' }}</div>
-          {% if p.gps.lat %}
-          <div style="color:#1ABC9C;font-size:11px;font-family:monospace;">GPS: {{ "%.4f"|format(p.gps.lat) }}, {{ "%.4f"|format(p.gps.lon) }}</div>
+          {% if p.cuidadores %}
+            {% for c in p.cuidadores %}
+            <div style="color:#5D6D7E;font-size:12px;">
+              {{ c.nombre or '—' }}
+              {% if c.gps.lat %}
+              <span style="color:#1ABC9C;font-family:monospace;font-size:11px;">
+                · GPS {{ "%.4f"|format(c.gps.lat) }}, {{ "%.4f"|format(c.gps.lon) }}
+              </span>
+              {% endif %}
+            </div>
+            {% endfor %}
           {% else %}
+          <div style="color:#9CA3AF;font-size:12px;">Sin cuidador asignado</div>
+          {% endif %}
+          {% if not p.cuidadores or not p.cuidadores | selectattr('gps.lat') | list %}
           <div style="color:#9CA3AF;font-size:11px;">Sin posición GPS</div>
           {% endif %}
         </div>
@@ -103,13 +114,15 @@ puntos.forEach(function(p) {
     }).addTo(map);
     bounds.push([p.beacon.lat, p.beacon.lon]);
   }
-  if (p.gps && p.gps.lat) {
-    var gps = L.circleMarker([p.gps.lat, p.gps.lon], {
-      radius: 7, color: '#1ABC9C', fillColor: '#1ABC9C', fillOpacity: 0.85, weight: 2
-    }).addTo(map);
-    gps.bindPopup('<b>' + (p.cuidador || 'Cuidador') + '</b><br>Paciente: ' + p.paciente + '<br>' + (p.gps.ts || ''));
-    bounds.push([p.gps.lat, p.gps.lon]);
-  }
+  (p.cuidadores || []).forEach(function(c) {
+    if (c.gps && c.gps.lat) {
+      var gps = L.circleMarker([c.gps.lat, c.gps.lon], {
+        radius: 7, color: '#1ABC9C', fillColor: '#1ABC9C', fillOpacity: 0.85, weight: 2
+      }).addTo(map);
+      gps.bindPopup('<b>' + (c.nombre || 'Cuidador') + '</b><br>Paciente: ' + p.paciente + '<br>' + (c.gps.ts || ''));
+      bounds.push([c.gps.lat, c.gps.lon]);
+    }
+  });
 });
 if (bounds.length > 0) {
   map.fitBounds(bounds, {padding: [30, 30]});

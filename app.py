@@ -1,3 +1,4 @@
+import atexit
 import os
 import uuid
 from datetime import date
@@ -5,15 +6,22 @@ from functools import wraps
 
 import bcrypt
 import psycopg
-from dotenv import load_dotenv
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from werkzeug.utils import secure_filename
 
-load_dotenv()
+_DB_HOST     = "127.0.0.1"
+_DB_NAME     = "medi_nfc2"
+_DB_USER     = "proyectofinal_user"
+_DB_PASS     = "444"
+_DB_PORT     = "5432"
+_SECRET_KEY  = "Grupo1"
+_ADMIN_EMAIL = "admin@medinfc.local"
+_ADMIN_HASH  = "$2b$12$yrMiWtApVrY6RTyEabeWT.w/Be4XnE1sZDQJOS7fkgpzZJrbICzMm"
 
 app = Flask(__name__)
 app.jinja_env.filters['enumerate'] = enumerate
-app.secret_key = os.environ["SECRET_KEY"]
+app.secret_key = _SECRET_KEY
 
 # Asegurar que el directorio de uploads exista al iniciar
 _UPLOAD_DIR = os.path.join(app.root_path, "static", "img", "uploads")
@@ -72,11 +80,11 @@ def inject_alert_count():
 
 def get_db():
     return psycopg.connect(
-        host=os.environ["DB_HOST"],
-        dbname=os.environ["DB_NAME"],
-        user=os.environ["DB_USER"],
-        password=os.environ["DB_PASS"],
-        port=os.environ.get("DB_PORT", "5432"),
+        host=_DB_HOST,
+        dbname=_DB_NAME,
+        user=_DB_USER,
+        password=_DB_PASS,
+        port=_DB_PORT,
     )
 
 # ─── Decoradores de acceso ───────────────────────────────────────────────────
@@ -117,10 +125,7 @@ def login():
             flash("Por favor ingresa email y contraseña.", "danger")
             return render_template("login.html")
 
-        # ── Verificar admin especial (credenciales en .env, sin registro en BD) ──
-        admin_email = os.environ.get("ADMIN_EMAIL", "")
-        admin_hash  = os.environ.get("ADMIN_PASSWORD_HASH", "")
-        if email == admin_email and admin_hash and bcrypt.checkpw(password.encode(), admin_hash.encode()):
+        if email == _ADMIN_EMAIL and bcrypt.checkpw(password.encode(), _ADMIN_HASH.encode()):
             session["user_id"]    = 0
             session["rol"]        = "admin"
             session["id_rol"]     = None
@@ -1848,15 +1853,35 @@ def doctor_mapa():
         cur.execute("FETCH ALL FROM cur_mapa")
         rows = cur.fetchall()
         conn.commit()
+
+        # El SP devuelve una fila por (paciente × cuidador); agrupamos por id_paciente
+        # para que las estadísticas y el panel cuenten pacientes únicos.
+        # Los marcadores GPS se guardan como lista anidada para pintarlos todos en el mapa.
+        pac_map = {}
         for r in rows:
             _, id_pac, pac, id_bec, bec_lat, bec_lon, radio, gps_lat, gps_lon, gps_ts, cuidador = r
-            puntos.append({
-                "id_paciente": id_pac,
-                "paciente":    pac,
-                "beacon":      {"id": id_bec, "lat": float(bec_lat or 0), "lon": float(bec_lon or 0), "radio": float(radio or 5)},
-                "gps":         {"lat": float(gps_lat or 0), "lon": float(gps_lon or 0), "ts": str(gps_ts or "")},
-                "cuidador":    cuidador,
-            })
+            if id_pac not in pac_map:
+                pac_map[id_pac] = {
+                    "id_paciente": id_pac,
+                    "paciente":    pac,
+                    "beacon":      {
+                        "id":    id_bec,
+                        "lat":   float(bec_lat or 0),
+                        "lon":   float(bec_lon or 0),
+                        "radio": float(radio or 5),
+                    },
+                    "cuidadores": [],
+                }
+            if gps_lat:
+                pac_map[id_pac]["cuidadores"].append({
+                    "nombre": cuidador or "",
+                    "gps": {
+                        "lat": float(gps_lat),
+                        "lon": float(gps_lon),
+                        "ts":  str(gps_ts or ""),
+                    },
+                })
+        puntos = list(pac_map.values())
 
         cur.close()
         conn.close()
@@ -2165,6 +2190,7 @@ def doctor_receta_desde_lista():
     tol_lst    = request.form.getlist("tolerancia[]")
     hora_lst   = request.form.getlist("hora[]")
     unidad_lst = request.form.getlist("unidad[]")
+    nfc_uids   = request.form.getlist("nfc_uids[]")
 
     if not id_pac:
         flash("Selecciona un paciente.", "danger")
@@ -2186,6 +2212,16 @@ def doctor_receta_desde_lista():
             flash(p_msg, "danger")
             cur.close(); conn.close()
             return redirect(url_for("doctor_recetas"))
+        # build id→nombre map from the form-available data via a quick query
+        med_nombres = {}
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_medicamento('L', NULL, NULL, NULL, 'cur_meds_rx')")
+        cur.fetchone()
+        cur.execute("FETCH ALL FROM cur_meds_rx")
+        for r in cur.fetchall():
+            med_nombres[str(r[0])] = r[1]
+        conn.commit()
+
         for i, mid in enumerate(med_ids):
             if not mid:
                 continue
@@ -2203,10 +2239,22 @@ def doctor_receta_desde_lista():
                 f"CALL sp_agregar_receta_med(NULL, NULL, NULL, '{cur_rxm}', %s, %s, %s, %s, %s, %s, %s)",
                 [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
             )
-            _, p_ok_m, p_msg_m = cur.fetchone()
+            p_id_rm, p_ok_m, p_msg_m = cur.fetchone()
             conn.commit()
             if p_ok_m != 1:
                 flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
+                continue
+            uid = nfc_uids[i] if i < len(nfc_uids) else ''
+            if uid.strip():
+                nombre_med = med_nombres.get(str(mid), str(mid))
+                cur.execute("""
+                    INSERT INTO etiqueta_nfc
+                        (uid_nfc, nombre, fecha_registro, tipo_etiqueta,
+                         id_receta_medicamento, estado_etiqueta)
+                    VALUES (%s, %s, NOW(), 'medicamento', %s, 'activo')
+                    ON CONFLICT (uid_nfc) DO NOTHING
+                """, [uid.strip(), f"{nombre_med} - Paciente", p_id_rm])
+                conn.commit()
         cur.close(); conn.close()
         flash("Receta creada correctamente.", "success")
     except Exception as e:
@@ -2267,15 +2315,17 @@ def doctor_recetas():
         cur.execute("FETCH ALL FROM cur_meds")
         rows_m = cur.fetchall()
         conn.commit()
-        medicamentos = [(r[0], r[1]) for r in rows_m]
+        medicamentos = [(r[0], r[1], r[3]) for r in rows_m]  # id, nombre, dosis_max
 
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar recetas: {e}", "danger")
+    unidades = [(1, 'mg'), (2, 'ml'), (3, 'mcg'), (4, 'UI'), (5, 'comp')]
     return render_template("doctor/recetas.html",
         recetas=list(recetas.values()),
         pacientes=pacientes,
         medicamentos=medicamentos,
+        unidades=unidades,
     )
 
 
@@ -2848,6 +2898,40 @@ def cuidador_mi_gps():
         gps=gps, ultima_ubicacion=ultima_ubicacion, posiciones=posiciones
     )
 
+# ─── Scheduler: detección automática de omisiones ───────────────────────────
+
+def detectar_omisiones():
+    conn = None
+    try:
+        conn = psycopg.connect(
+            host=_DB_HOST,
+            dbname=_DB_NAME,
+            user=_DB_USER,
+            password=_DB_PASS,
+            port=_DB_PORT,
+        )
+        with conn.cursor() as cur:
+            cur.execute("BEGIN")
+            cur.execute("CALL sp_detectar_omisiones(NULL, NULL, NULL, 'cur_om')")
+            p_ok, p_msg, p_total = cur.fetchone()[:3]
+            cur.execute("FETCH ALL FROM cur_om")
+            conn.commit()
+        print(f"[scheduler] omisiones detectadas={p_total} | {p_msg}")
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"[scheduler] ERROR detectar_omisiones: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(detectar_omisiones, "interval", minutes=5)
+
 # ═══════════════════════════════════════════════════════
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    if not scheduler.running:
+        scheduler.start()
+        atexit.register(lambda: scheduler.shutdown())
+    app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False)

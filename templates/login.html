@@ -4,177 +4,468 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="color-scheme" content="light"/>
-  <title>Iniciar sesion — MediNFC</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}"/>
+  <title>Iniciar sesión — MediNFC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     html, body {
-      background: #F4F6F8 !important;
-      color: #2C3E50 !important;
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: #F0F4F8;
+      color: #2C3E50;
+    }
+
+    .login-wrap {
       display: flex;
       min-height: 100vh;
     }
+
+    /* ── LEFT PANEL ─────────────────────────────────── */
     .login-left {
-      width: 460px; min-height: 100vh;
-      background: #ffffff !important;
-      display: flex; flex-direction: column;
-      padding: 40px;
-      box-shadow: 4px 0 24px rgba(0,0,0,.06);
-      position: relative; z-index: 1;
-      color: #2C3E50;
+      width: 40%;
+      min-height: 100vh;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 56px 52px;
+      box-shadow: 6px 0 32px rgba(0,0,0,.07);
+      position: relative;
+      z-index: 1;
     }
-    .login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 48px; }
-    .login-logo .logo-icon {
-      width: 44px; height: 44px; background: #1B4F72; border-radius: 12px;
-      display: flex; align-items: center; justify-content: center; color: white;
+
+    /* Logo */
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 52px;
     }
-    .login-logo .logo-name {
+    .logo-icon-box {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, #1B4F72, #1A8C6E);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      box-shadow: 0 4px 14px rgba(27,79,114,.35);
+    }
+    .logo-text {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 22px; font-weight: 700; color: #1B4F72;
+      font-size: 24px;
+      font-weight: 700;
+      color: #1B4F72;
+      letter-spacing: -.3px;
     }
-    .login-logo .logo-name span { color: #1ABC9C; }
-    .login-heading {
+    .logo-text span { color: #1ABC9C; }
+
+    /* Heading */
+    .form-heading {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 26px; font-weight: 700;
-      margin-bottom: 6px; color: #2C3E50;
+      font-size: 28px;
+      font-weight: 700;
+      color: #1A2B3C;
+      margin-bottom: 6px;
+      letter-spacing: -.4px;
     }
-    .login-sub { font-size: 14px; color: #5D6D7E; margin-bottom: 32px; }
-    .btn-login {
-      width: 100%; height: 48px;
-      background: #1B4F72 !important; color: white !important;
-      border: none; border-radius: 8px;
-      font-size: 15px; font-weight: 600;
-      cursor: pointer; transition: background .18s; margin-top: 4px;
-      font-family: inherit;
+    .form-sub {
+      font-size: 14px;
+      color: #6B7C93;
+      margin-bottom: 36px;
+      line-height: 1.5;
     }
-    .btn-login:hover { background: #154060 !important; }
+
+    /* Flash */
+    .flash-error {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      color: #B91C1C;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13.5px;
+      margin-bottom: 22px;
+    }
+
+    /* Field group */
+    .field {
+      margin-bottom: 20px;
+    }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 7px;
+      letter-spacing: .01em;
+    }
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-wrap .fi {
+      position: absolute;
+      left: 14px;
+      color: #9DAFC2;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+    }
+    .input-wrap input {
+      width: 100%;
+      height: 48px;
+      padding: 0 14px 0 42px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: #1A2B3C;
+      background: #F8FAFC;
+      border: 1.5px solid #DDE3EC;
+      border-radius: 10px;
+      outline: none;
+      transition: border-color .18s, box-shadow .18s, background .18s;
+    }
+    .input-wrap input::placeholder { color: #B0BEC8; }
+    .input-wrap input:focus {
+      border-color: #1B4F72;
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(27,79,114,.10);
+    }
+
+    /* Password toggle */
+    .toggle-pw {
+      position: absolute;
+      right: 13px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #9DAFC2;
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      border-radius: 6px;
+      transition: color .15s;
+    }
+    .toggle-pw:hover { color: #1B4F72; }
+
+    /* Submit */
+    .btn-submit {
+      width: 100%;
+      height: 50px;
+      background: linear-gradient(135deg, #1B4F72 0%, #1A5C52 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      cursor: pointer;
+      transition: opacity .18s, transform .12s, box-shadow .18s;
+      box-shadow: 0 4px 16px rgba(27,79,114,.30);
+      margin-top: 6px;
+    }
+    .btn-submit:hover {
+      opacity: .92;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(27,79,114,.38);
+    }
+    .btn-submit:active { transform: translateY(0); }
+
+    /* Forgot link */
+    .forgot-link {
+      display: block;
+      text-align: center;
+      margin-top: 18px;
+      font-size: 13.5px;
+      color: #1B4F72;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color .15s;
+    }
+    .forgot-link:hover { color: #1ABC9C; }
+
+    /* ── RIGHT PANEL ─────────────────────────────────── */
     .login-right {
       flex: 1;
-      background: #1B4F72;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 40px; position: relative; overflow: hidden;
+      background: linear-gradient(145deg, #0D3B5E 0%, #0B6E5A 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 56px 48px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Decorative blobs */
+    .login-right::before,
+    .login-right::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
     }
     .login-right::before {
-      content: ''; position: absolute; inset: 0;
-      background:
-        radial-gradient(ellipse at 30% 50%, rgba(26,188,156,.18) 0%, transparent 60%),
-        radial-gradient(ellipse at 80% 80%, rgba(255,255,255,.05) 0%, transparent 50%);
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(26,188,156,.15) 0%, transparent 70%);
+      top: -120px; right: -120px;
     }
+    .login-right::after {
+      width: 380px; height: 380px;
+      background: radial-gradient(circle, rgba(13,59,94,.4) 0%, transparent 70%);
+      bottom: -80px; left: -60px;
+    }
+
+    /* NFC animation */
     .nfc-anim {
-      position: relative; width: 160px; height: 160px;
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 32px;
+      position: relative;
+      width: 180px; height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 40px;
+      z-index: 1;
     }
     .nfc-ring {
-      position: absolute; border-radius: 50%;
-      border: 2px solid rgba(26,188,156,.4);
-      animation: pulse-ring 2.4s ease-out infinite;
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(26,188,156,.5);
+      animation: pulse-nfc 2.8s ease-out infinite;
     }
-    .nfc-ring:nth-child(1) { width: 60px;  height: 60px;  animation-delay: 0s;   }
-    .nfc-ring:nth-child(2) { width: 100px; height: 100px; animation-delay: .6s;  }
-    .nfc-ring:nth-child(3) { width: 140px; height: 140px; animation-delay: 1.2s; }
-    @keyframes pulse-ring {
-      0%   { transform: scale(.8); opacity: 0; }
-      40%  { opacity: 1; }
-      100% { transform: scale(1.1); opacity: 0; }
+    .nfc-ring:nth-child(1) { width: 68px;  height: 68px;  animation-delay: 0s;   }
+    .nfc-ring:nth-child(2) { width: 112px; height: 112px; animation-delay: .7s;  }
+    .nfc-ring:nth-child(3) { width: 156px; height: 156px; animation-delay: 1.4s; }
+    @keyframes pulse-nfc {
+      0%   { transform: scale(.75); opacity: 0; }
+      35%  { opacity: .9; }
+      100% { transform: scale(1.08); opacity: 0; }
     }
-    .nfc-center {
-      width: 56px; height: 56px; background: #1ABC9C; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      color: white; position: relative; z-index: 1;
-      box-shadow: 0 4px 20px rgba(26,188,156,.4);
+    .nfc-core {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, #1ABC9C, #16A085);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      position: relative;
+      z-index: 2;
+      box-shadow:
+        0 0 0 6px rgba(26,188,156,.15),
+        0 6px 28px rgba(26,188,156,.45);
+      animation: core-glow 3s ease-in-out infinite alternate;
     }
-    .login-right h2 {
+    @keyframes core-glow {
+      from { box-shadow: 0 0 0 6px rgba(26,188,156,.12), 0 6px 28px rgba(26,188,156,.35); }
+      to   { box-shadow: 0 0 0 10px rgba(26,188,156,.22), 0 8px 36px rgba(26,188,156,.55); }
+    }
+
+    /* Right copy */
+    .rp-title {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 22px; font-weight: 700;
-      color: white; text-align: center; margin-bottom: 10px; position: relative;
+      font-size: 30px;
+      font-weight: 700;
+      color: #ffffff;
+      text-align: center;
+      line-height: 1.25;
+      letter-spacing: -.4px;
+      margin-bottom: 14px;
+      position: relative;
+      z-index: 1;
+      max-width: 380px;
     }
-    .login-right p {
-      font-size: 14px; color: rgba(255,255,255,.65);
-      text-align: center; position: relative; max-width: 300px;
+    .rp-sub {
+      font-size: 15px;
+      color: rgba(255,255,255,.60);
+      text-align: center;
+      max-width: 340px;
+      line-height: 1.6;
+      position: relative;
+      z-index: 1;
+      margin-bottom: 44px;
     }
-    .stats-pills { display: flex; gap: 12px; margin-top: 32px; position: relative; }
-    .stat-pill {
-      background: rgba(255,255,255,.10) !important;
-      border-radius: 8px; padding: 10px 16px; text-align: center;
+
+    /* Stats cards */
+    .stats-row {
+      display: flex;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
     }
-    .stat-pill .n {
+    .stat-card {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(8px);
+      border-radius: 14px;
+      padding: 16px 22px;
+      text-align: center;
+      transition: background .2s, transform .2s;
+    }
+    .stat-card:hover {
+      background: rgba(255,255,255,.13);
+      transform: translateY(-2px);
+    }
+    .stat-card .sv {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 22px; font-weight: 700; color: #1ABC9C;
+      font-size: 26px;
+      font-weight: 700;
+      color: #1ABC9C;
+      line-height: 1;
+      margin-bottom: 5px;
     }
-    .stat-pill .l { font-size: 11px; color: rgba(255,255,255,.65); }
-    @media(max-width: 768px) {
+    .stat-card .sl {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: rgba(255,255,255,.55);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    /* Divider tag */
+    .right-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(26,188,156,.18);
+      border: 1px solid rgba(26,188,156,.3);
+      color: #1ABC9C;
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
       .login-right { display: none; }
-      .login-left  { width: 100%; }
+      .login-left  { width: 100%; padding: 48px 32px; }
+    }
+    @media (max-width: 480px) {
+      .login-left { padding: 36px 24px; }
+      .form-heading { font-size: 24px; }
     }
   </style>
 </head>
 <body>
+<div class="login-wrap">
 
-<div class="login-left">
-  <div class="login-logo">
-    <div class="logo-icon">
-      <i data-lucide="radio" style="width:22px;height:22px;"></i>
+  <!-- ── LEFT PANEL ── -->
+  <div class="login-left">
+
+    <div class="logo-wrap">
+      <div class="logo-icon-box">
+        <i data-lucide="radio" style="width:22px;height:22px;"></i>
+      </div>
+      <span class="logo-text">Medi<span>NFC</span></span>
     </div>
-    <span class="logo-name">Medi<span>NFC</span></span>
+
+    <h1 class="form-heading">Bienvenido de vuelta</h1>
+    <p class="form-sub">Ingresa tus credenciales para acceder a la plataforma de adherencia terapéutica.</p>
+
+    {% if error %}
+    <div class="flash-error">
+      <i data-lucide="alert-circle" style="width:16px;height:16px;flex-shrink:0;"></i>
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('login') }}" autocomplete="on">
+
+      <div class="field">
+        <label for="email">Correo electrónico</label>
+        <div class="input-wrap">
+          <span class="fi">
+            <i data-lucide="mail" style="width:16px;height:16px;"></i>
+          </span>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="usuario@medinfc.com"
+            autocomplete="username"
+            value="{{ request.form.get('email','') }}"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <div class="input-wrap">
+          <span class="fi">
+            <i data-lucide="lock" style="width:16px;height:16px;"></i>
+          </span>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="••••••••"
+            autocomplete="current-password"
+            required
+          />
+          <button type="button" class="toggle-pw" id="togglePw" aria-label="Mostrar contraseña">
+            <i data-lucide="eye" style="width:17px;height:17px;" id="eyeIcon"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">Iniciar sesión</button>
+    </form>
+
+    <a href="#" class="forgot-link">¿Olvidaste tu contraseña?</a>
+
   </div>
 
-  <h1 class="login-heading">Bienvenido de vuelta</h1>
-  <p class="login-sub">Ingresa tus credenciales para acceder a la plataforma.</p>
+  <!-- ── RIGHT PANEL ── -->
+  <div class="login-right">
 
-  {% if error %}
-  <div class="flash flash-danger">
-    <i data-lucide="alert-circle" style="width:16px;height:16px;"></i> {{ error }}
-  </div>
-  {% endif %}
+    <div class="right-badge">
+      <i data-lucide="shield-check" style="width:13px;height:13px;"></i>
+      Plataforma médica segura
+    </div>
 
-  <form method="POST" action="{{ url_for('login') }}">
-    <div class="form-group">
-      <label class="form-label" for="email">Correo electronico</label>
-      <div class="input-icon-wrap">
-        <i data-lucide="mail" class="icon" style="width:16px;height:16px;"></i>
-        <input type="text" id="email" name="email" class="form-control"
-               placeholder="usuario [at] medinfc.com"
-               autocomplete="username"
-               value="{{ request.form.get('email','') }}"/>
+    <div class="nfc-anim">
+      <div class="nfc-ring"></div>
+      <div class="nfc-ring"></div>
+      <div class="nfc-ring"></div>
+      <div class="nfc-core">
+        <i data-lucide="radio" style="width:28px;height:28px;"></i>
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label" for="password">Contrasena</label>
-      <div class="input-icon-wrap">
-        <i data-lucide="lock" class="icon" style="width:16px;height:16px;"></i>
-        <input type="password" id="password" name="password" class="form-control"
-               placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-               autocomplete="current-password"
-               required/>
-      </div>
-    </div>
-    <button type="submit" class="btn-login">Iniciar sesion</button>
-  </form>
 
-</div>
+    <h2 class="rp-title">Adherencia terapéutica inteligente</h2>
+    <p class="rp-sub">Control de medicación con NFC, GPS e IoT para el cuidado de adultos mayores en tiempo real.</p>
 
-<div class="login-right">
-  <div class="nfc-anim">
-    <div class="nfc-ring"></div>
-    <div class="nfc-ring"></div>
-    <div class="nfc-ring"></div>
-    <div class="nfc-center">
-      <i data-lucide="radio" style="width:26px;height:26px;"></i>
-    </div>
-  </div>
-  <h2>Adherencia terapeutica inteligente</h2>
-  <p>Control de medicacion con NFC, GPS e IoT para adultos mayores.</p>
-  <div class="stats-pills">
-    <div class="stat-pill"><div class="n">25</div><div class="l">Tablas BD</div></div>
-    <div class="stat-pill"><div class="n">3FN</div><div class="l">Normalizado</div></div>
-    <div class="stat-pill"><div class="n">IoT</div><div class="l">GPS+Beacon</div></div>
-  </div>
+   
+
 </div>
 
 <script>
   lucide.createIcons();
+
+  // Password toggle
+  const pwInput  = document.getElementById('password');
+  const toggleBtn = document.getElementById('togglePw');
+  const eyeIcon  = document.getElementById('eyeIcon');
+  let visible = false;
+
+  toggleBtn.addEventListener('click', () => {
+    visible = !visible;
+    pwInput.type = visible ? 'text' : 'password';
+    eyeIcon.setAttribute('data-lucide', visible ? 'eye-off' : 'eye');
+    lucide.createIcons();
+  });
 </script>
 </body>
 </html>

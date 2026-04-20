@@ -4,7 +4,7 @@ medi_nfc2  v7
 ==============================================================================
 
 Ejecutar DESPUÉS de seed_data.sql:
-    pip install psycopg2-binary bcrypt python-dotenv
+    pip install psycopg[binary] bcrypt python-dotenv
     python seed_users.py
 
 El script es idempotente: si un usuario ya existe (p_ok=-10) lo reporta
@@ -47,7 +47,7 @@ CUIDADORES — Escenarios (ids 9-14)
 
 import sys
 import bcrypt
-import psycopg2
+import psycopg
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -57,7 +57,7 @@ DB_DSN = "postgresql://proyectofinal_user:444@localhost:5432/medi_nfc2"
 
 
 def get_conn():
-    return psycopg2.connect(DB_DSN)
+    return psycopg.connect(DB_DSN)
 
 
 # ── Utilidades ────────────────────────────────────────────────────────────────
