@@ -25,15 +25,15 @@
       </tr></thead>
       <tbody>
         {% for m in medicamentos %}
-        {# m: (0=id, 1=nombre_generico, 2=codigo_atc, 3=dosis_max, 4=unidad, 5=id_unidad) #}
+        {# m: (0=id_medicamento, 1=nombre_generico, 2=codigo_atc, 3=dosis_max, 4=activo, 5=unidad, 6=id_unidad) #}
         <tr data-searchable>
           <td style="font-weight:500;">{{ m[1] }}</td>
           <td style="font-family:monospace;font-size:12px;">{{ m[2] }}</td>
           <td style="font-size:13px;">{{ m[3] }}</td>
-          <td style="font-size:13px;">{{ m[4] }}</td>
+          <td style="font-size:13px;">{{ m[5] }}</td>
           <td style="text-align:right;">
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
-              onclick="editMed({{ m[0] }},'{{ m[1]|e }}','{{ m[2]|e }}',{{ m[3] or 0 }},{{ m[5] or 0 }})">
+              onclick="editMed({{ m[0] }},'{{ m[1]|e }}','{{ m[2]|e }}',{{ m[3] or 0 }},{{ m[6] or 0 }})">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
@@ -79,7 +79,7 @@
             <select class="form-control" id="med-unidad" name="id_unidad">
               <option value="">— Seleccionar —</option>
               {% for u in unidades %}
-              <option value="{{ u[0] }}">{{ u[1] }}</option>
+              <option value="{{ u[0] }}">{{ u[2] }} ({{ u[1] }})</option>
               {% endfor %}
             </select>
           </div>

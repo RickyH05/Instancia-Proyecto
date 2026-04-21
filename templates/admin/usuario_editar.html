@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Editar usuario{% endblock %}
+{% block page_title %}Editar usuario{% endblock %}
+{% block content %}
+
+{# sp_rep_lista_usuarios cols:
+   0=id_usuario, 1=email, 2=rol_usuario, 3=activo, 4=ultimo_acceso,
+   5=nombre_persona, 6=id_rol #}
+
+<div class="page-header">
+  <div>
+    <h1>Editar usuario</h1>
+    <p>{{ usuario[5] or usuario[1] }} —
+      {% if usuario[2] == 'medico' %}
+        <span class="badge badge-blue">Médico</span>
+      {% else %}
+        <span class="badge badge-green">Cuidador</span>
+      {% endif %}
+    </p>
+  </div>
+  <a href="{{ url_for('admin_usuarios') }}" class="btn btn-outline">
+    <i data-lucide="arrow-left" style="width:14px;height:14px;"></i> Volver
+  </a>
+</div>
+
+<div style="max-width:520px;">
+  <div class="card">
+    <div class="card-header" style="padding:16px 20px;border-bottom:1px solid #E5E7EB;">
+      <h3 style="font-size:15px;font-weight:600;margin:0;">Datos de acceso</h3>
+    </div>
+    <form method="POST" action="{{ url_for('admin_usuario_editar', id_usr=usuario[0]) }}">
+      <div class="modal-body" style="padding:20px;">
+
+        <div style="padding:12px 14px;background:#F8F9FA;border-radius:8px;margin-bottom:18px;font-size:13px;color:#5D6D7E;">
+          <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <span><strong>Persona:</strong> {{ usuario[5] or '—' }}</span>
+            <span><strong>Rol:</strong> {{ usuario[2] }}</span>
+            <span><strong>Estado:</strong>
+              {% if usuario[3] %}<span class="badge badge-green">Activo</span>
+              {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
+            </span>
+            <span><strong>Último acceso:</strong> {{ usuario[4] or 'Nunca' }}</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-control" name="email" type="email"
+                 value="{{ usuario[1] }}" placeholder="Dejar vacío para no cambiar"/>
+          <div style="font-size:11px;color:#9CA3AF;margin-top:3px;">Dejar vacío para conservar el actual.</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Nueva contraseña</label>
+          <input class="form-control" name="password" type="password"
+                 placeholder="Dejar vacío para no cambiar"/>
+          <div style="font-size:11px;color:#9CA3AF;margin-top:3px;">Dejar vacío para conservar la actual.</div>
+        </div>
+
+        <div style="padding:12px;background:rgba(243,156,18,.08);border-radius:8px;font-size:13px;color:#7D6608;line-height:1.5;">
+          <i data-lucide="alert-triangle" style="width:13px;height:13px;display:inline;margin-right:4px;"></i>
+          Si ambos campos quedan vacíos no se realizará ningún cambio.
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:16px 20px;border-top:1px solid #E5E7EB;display:flex;justify-content:flex-end;gap:8px;">
+        <a href="{{ url_for('admin_usuarios') }}" class="btn btn-ghost">Cancelar</a>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar cambios
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

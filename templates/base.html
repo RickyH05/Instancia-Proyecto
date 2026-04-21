@@ -42,13 +42,15 @@
       <a href="{{ url_for('admin_medicos') }}"        class="nav-item"><i data-lucide="stethoscope"    class="nav-icon"></i>Medicos</a>
       <a href="{{ url_for('admin_cuidadores') }}"     class="nav-item"><i data-lucide="users"          class="nav-icon"></i>Cuidadores</a>
       <a href="{{ url_for('admin_pacientes') }}"      class="nav-item"><i data-lucide="user"           class="nav-icon"></i>Pacientes</a>
+      <a href="{{ url_for('admin_usuarios') }}"       class="nav-item"><i data-lucide="key-round"      class="nav-icon"></i>Usuarios</a>
       <a href="{{ url_for('admin_medicamentos') }}"   class="nav-item"><i data-lucide="pill"           class="nav-icon"></i>Medicamentos</a>
       <a href="{{ url_for('admin_diagnosticos') }}"   class="nav-item"><i data-lucide="heart-pulse"    class="nav-icon"></i>Diagnosticos</a>
       <a href="{{ url_for('admin_especialidades') }}" class="nav-item"><i data-lucide="graduation-cap" class="nav-icon"></i>Especialidades</a>
       <div class="nav-label">IoT</div>
       <a href="{{ url_for('admin_gps') }}"     class="nav-item"><i data-lucide="smartphone" class="nav-icon"></i>Dispositivos GPS</a>
       <a href="{{ url_for('admin_beacon') }}" class="nav-item"><i data-lucide="radio"      class="nav-icon"></i>Beacons BLE</a>
-      <div class="nav-label">Sistema</div>
+      <div class="nav-label">Supervisión</div>
+      <a href="{{ url_for('admin_supervision_detalle') }}" class="nav-item"><i data-lucide="git-branch" class="nav-icon"></i>Supervisión Ampliada</a>
       <div class="nav-label">Reportes</div>
       <a href="{{ url_for('admin_reporte_ranking_mejora') }}"  class="nav-item"><i data-lucide="trophy"         class="nav-icon"></i>Ranking mejora</a>
       <a href="{{ url_for('admin_reporte_tendencia_global') }}" class="nav-item"><i data-lucide="trending-up"    class="nav-icon"></i>Tendencia global</a>

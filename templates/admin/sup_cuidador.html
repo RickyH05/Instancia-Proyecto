@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Pacientes de {{ cuidador }}{% endblock %}
+{% block page_title %}Pacientes de {{ cuidador }}{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1>Pacientes de {{ cuidador }}</h1>
+    <p>{{ pacientes | length }} paciente(s) a cargo</p>
+  </div>
+  <a href="{{ url_for('admin_supervision_detalle') }}" class="btn btn-outline">
+    <i data-lucide="arrow-left" style="width:14px;height:14px;"></i> Volver
+  </a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Paciente</th><th>Médico</th><th>Medicamentos activos</th><th>Estado receta</th><th></th>
+      </tr></thead>
+      <tbody>
+        {% for id_pac, info in pacientes.items() %}
+        <tr>
+          <td style="font-weight:500;">{{ info.nombre }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ info.medico or '—' }}</td>
+          <td style="font-size:13px;">
+            {% for m in info.medicamentos %}
+              <div>{{ m }}</div>
+            {% else %}
+              <span style="color:#9CA3AF;">—</span>
+            {% endfor %}
+          </td>
+          <td>
+            {% if info.estado_receta == 'vigente' %}
+              <span class="badge badge-green">Vigente</span>
+            {% elif info.estado_receta == 'vencida' %}
+              <span class="badge badge-yellow">Vencida</span>
+            {% elif info.estado_receta %}
+              <span class="badge badge-red">{{ info.estado_receta | capitalize }}</span>
+            {% else %}
+              <span style="color:#9CA3AF;font-size:12px;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if info.es_principal %}
+              <span class="badge badge-green" style="font-size:11px;">PRINCIPAL</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:32px;">Sin pacientes.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

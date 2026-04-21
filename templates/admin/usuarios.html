@@ -3,8 +3,12 @@
 {% block page_title %}Usuarios{% endblock %}
 {% block content %}
 
+{# sp_rep_lista_usuarios cols:
+   0=id_usuario, 1=email, 2=rol_usuario, 3=activo, 4=ultimo_acceso,
+   5=nombre_persona, 6=id_rol #}
+
 <div class="page-header">
-  <div><h1>Usuarios del sistema</h1><p>Cuentas de acceso vinculadas a medicos y cuidadores</p></div>
+  <div><h1>Usuarios del sistema</h1><p>Cuentas de acceso vinculadas a médicos y cuidadores</p></div>
   <button class="btn btn-primary" onclick="openModal('modal-usuario')">
     <i data-lucide="plus" style="width:16px;height:16px;"></i> Nuevo usuario
   </button>
@@ -13,13 +17,14 @@
 <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
   <div class="search-bar" style="flex:1;min-width:200px;">
     <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
-    <input id="search-input" class="form-control" placeholder="Buscar por email o rol..."/>
+    <input id="search-input" class="form-control" placeholder="Buscar por email, nombre o rol..."/>
   </div>
   <div class="filter-pills" style="margin:0;">
-    <span class="pill active">Todos</span>
-    <span class="pill">Medicos</span>
-    <span class="pill">Cuidadores</span>
-    <span class="pill">Activos</span>
+    <span class="pill active" data-filter="todos">Todos</span>
+    <span class="pill" data-filter="medico">Médicos</span>
+    <span class="pill" data-filter="cuidador">Cuidadores</span>
+    <span class="pill" data-filter="activo">Activos</span>
+    <span class="pill" data-filter="inactivo">Inactivos</span>
   </div>
 </div>
 
@@ -27,28 +32,54 @@
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>Email</th><th>Rol</th><th>ID vinculado</th><th>Estado</th><th>Ultimo acceso</th>
+        <th>Email</th><th>Nombre</th><th>Rol</th><th>Estado</th>
+        <th>Último acceso</th><th style="text-align:right;">Acciones</th>
       </tr></thead>
       <tbody>
         {% for u in usuarios %}
-        <tr data-searchable>
+        <tr data-searchable data-rol="{{ u[2] }}" data-activo="{{ 'activo' if u[3] else 'inactivo' }}">
           <td style="font-weight:500;">{{ u[1] }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ u[5] or '—' }}</td>
           <td>
             {% if u[2] == 'medico' %}
-              <span class="badge badge-blue">Medico</span>
+              <span class="badge badge-blue">Médico</span>
             {% else %}
               <span class="badge badge-green">Cuidador</span>
             {% endif %}
           </td>
-          <td style="font-family:monospace;font-size:13px;color:#5D6D7E;">{{ u[3] or '—' }}</td>
           <td>
-            {% if u[4] %}<span class="badge badge-green">Activo</span>
+            {% if u[3] %}<span class="badge badge-green">Activo</span>
             {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
           </td>
-          <td style="font-size:13px;color:#5D6D7E;">{{ u[5] or 'Nunca' }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ u[4] or 'Nunca' }}</td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a href="{{ url_for('admin_usuario_editar', id_usr=u[0]) }}"
+               class="btn btn-ghost btn-icon btn-sm" title="Editar">
+              <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </a>
+            {% if u[3] %}
+            <form method="POST"
+                  action="{{ url_for('admin_usuario_desactivar', id_usr=u[0]) }}"
+                  style="display:inline;"
+                  onsubmit="return confirm('¿Desactivar a {{ u[1]|e }}?')">
+              <button type="submit" class="btn btn-ghost btn-icon btn-sm" title="Desactivar">
+                <i data-lucide="user-x" style="width:14px;height:14px;color:#E74C3C;"></i>
+              </button>
+            </form>
+            {% else %}
+            <form method="POST"
+                  action="{{ url_for('admin_usuario_activar', id_usr=u[0]) }}"
+                  style="display:inline;"
+                  onsubmit="return confirm('¿Reactivar a {{ u[1]|e }}?')">
+              <button type="submit" class="btn btn-ghost btn-icon btn-sm" title="Activar">
+                <i data-lucide="user-check" style="width:14px;height:14px;color:#27AE60;"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:32px;">No hay usuarios registrados.</td></tr>
+        <tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:32px;">No hay usuarios registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -57,7 +88,7 @@
 
 <!-- Modal nuevo usuario -->
 <div id="modal-usuario" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-usuario')">
-  <div class="modal-box" style="max-width:480px;">
+  <div class="modal-box" style="max-width:500px;">
     <div class="modal-header">
       <span class="modal-title">Nuevo usuario</span>
       <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-usuario')">
@@ -68,29 +99,41 @@
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Email *</label>
-          <input class="form-control" name="email" type="text" placeholder="usuario@medinfc.com" required/>
+          <input class="form-control" name="email" type="email" placeholder="usuario@medinfc.mx" required/>
         </div>
         <div class="form-group">
-          <label class="form-label">Contrasena *</label>
-          <input class="form-control" name="password" type="password" placeholder="Minimo 8 caracteres" required/>
+          <label class="form-label">Contraseña *</label>
+          <input class="form-control" name="password" type="password" placeholder="Mínimo 8 caracteres" required/>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="form-group">
-            <label class="form-label">Rol *</label>
-            <select class="form-control" name="rol" id="sel-rol" onchange="updateIdPlaceholder()" required>
-              <option value="">Seleccionar...</option>
-              <option value="medico">Medico</option>
-              <option value="cuidador">Cuidador</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" id="lbl-id-rol">ID de medico / cuidador *</label>
-            <input class="form-control" name="id_rol" id="inp-id-rol" type="number" placeholder="ID numerico" required/>
-          </div>
+        <div class="form-group">
+          <label class="form-label">Rol *</label>
+          <select class="form-control" name="rol" id="sel-rol" onchange="actualizarSelect()" required>
+            <option value="">— Seleccionar —</option>
+            <option value="medico">Médico</option>
+            <option value="cuidador">Cuidador</option>
+          </select>
+        </div>
+        <div class="form-group" id="grp-medico" style="display:none;">
+          <label class="form-label">Médico *</label>
+          <select class="form-control" name="id_rol" id="sel-medico">
+            <option value="">— Seleccionar médico —</option>
+            {% for m in medicos %}
+            <option value="{{ m[0] }}">{{ m[1] }}{% if m[2] %} — {{ m[2] }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" id="grp-cuidador" style="display:none;">
+          <label class="form-label">Cuidador *</label>
+          <select class="form-control" name="id_rol" id="sel-cuidador">
+            <option value="">— Seleccionar cuidador —</option>
+            {% for c in cuidadores %}
+            <option value="{{ c[0] }}">{{ c[1] }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div style="padding:12px;background:rgba(27,79,114,.06);border-radius:8px;font-size:13px;color:#5D6D7E;line-height:1.6;">
           <i data-lucide="info" style="width:13px;height:13px;display:inline;margin-right:4px;color:#1B4F72;"></i>
-          El medico o cuidador debe existir previamente en el sistema antes de crear su usuario.
+          El médico o cuidador debe existir previamente en el sistema.
         </div>
       </div>
       <div class="modal-footer">
@@ -106,8 +149,40 @@
 {% endblock %}
 {% block scripts %}<script>
 lucide.createIcons();
-function updateIdPlaceholder(){
+
+// Filtro pills
+document.querySelectorAll('.pill[data-filter]').forEach(function(pill) {
+  pill.addEventListener('click', function() {
+    document.querySelectorAll('.pill[data-filter]').forEach(p => p.classList.remove('active'));
+    this.classList.add('active');
+    var f = this.dataset.filter;
+    document.querySelectorAll('tr[data-searchable]').forEach(function(tr) {
+      if (f === 'todos') { tr.style.display = ''; return; }
+      if (f === 'activo'   && tr.dataset.activo === 'activo')   { tr.style.display = ''; return; }
+      if (f === 'inactivo' && tr.dataset.activo === 'inactivo') { tr.style.display = ''; return; }
+      if (tr.dataset.rol === f) { tr.style.display = ''; return; }
+      tr.style.display = 'none';
+    });
+  });
+});
+
+// Búsqueda
+document.getElementById('search-input').addEventListener('input', function() {
+  var q = this.value.toLowerCase();
+  document.querySelectorAll('tr[data-searchable]').forEach(function(tr) {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
+// Modal: mostrar select correcto según rol
+function actualizarSelect() {
   var rol = document.getElementById('sel-rol').value;
-  document.getElementById('lbl-id-rol').textContent = rol === 'medico' ? 'ID de medico *' : rol === 'cuidador' ? 'ID de cuidador *' : 'ID numerico *';
+  document.getElementById('grp-medico').style.display   = rol === 'medico'    ? '' : 'none';
+  document.getElementById('grp-cuidador').style.display = rol === 'cuidador'  ? '' : 'none';
+  // deshabilitar el select que no aplica para que no se envíe
+  document.getElementById('sel-medico').disabled   = rol !== 'medico';
+  document.getElementById('sel-cuidador').disabled = rol !== 'cuidador';
 }
+// inicializar
+actualizarSelect();
 </script>{% endblock %}

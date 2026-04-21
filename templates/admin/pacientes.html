@@ -39,14 +39,6 @@
             {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
           </td>
           <td style="text-align:right;white-space:nowrap;">
-            <button class="btn btn-ghost btn-icon btn-sm" title="Asignar diagnóstico"
-              onclick="openAsignarDx({{ p[0] }},'{{ (p[1] ~ ' ' ~ p[2])|e }}')">
-              <i data-lucide="heart-pulse" style="width:14px;height:14px;color:#5D6D7E;"></i>
-            </button>
-            <button class="btn btn-ghost btn-icon btn-sm" title="Asignar cuidador"
-              onclick="openAsignarCuid({{ p[0] }},'{{ (p[1] ~ ' ' ~ p[2])|e }}')">
-              <i data-lucide="users" style="width:14px;height:14px;color:#5D6D7E;"></i>
-            </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
               onclick="editPac({{ p[0] }},'{{ p[1]|e }}','{{ p[2]|e }}','{{ p[3]|e }}','{{ p[5]|e }}','{{ p[4] }}')">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
@@ -162,81 +154,6 @@
   </div>
 </div>
 
-{# ══════════════════════════════════════════════════════ #}
-{# MODAL — Asignar diagnóstico                           #}
-{# ══════════════════════════════════════════════════════ #}
-<div id="modal-dx" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-dx')">
-  <div class="modal-box" style="max-width:440px;">
-    <div class="modal-header">
-      <span class="modal-title">Asignar Diagnóstico</span>
-      <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-dx')">
-        <i data-lucide="x" style="width:16px;height:16px;"></i>
-      </button>
-    </div>
-    <form id="form-dx" method="POST" action="">
-      <div class="modal-body">
-        <p id="dx-info" style="font-size:13px;color:#5D6D7E;margin-bottom:14px;"></p>
-        <div class="form-group">
-          <label class="form-label">Diagnóstico *</label>
-          <select class="form-control" name="id_diagnostico" required>
-            <option value="">— Seleccionar —</option>
-            {% for d in diagnosticos %}
-            <option value="{{ d[0] }}">{{ d[1] }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-dx')">Cancelar</button>
-        <button type="submit" class="btn btn-primary">
-          <i data-lucide="save" style="width:14px;height:14px;"></i> Asignar
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-{# ══════════════════════════════════════════════════════ #}
-{# MODAL — Asignar cuidador                              #}
-{# ══════════════════════════════════════════════════════ #}
-<div id="modal-cuid" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-cuid')">
-  <div class="modal-box" style="max-width:440px;">
-    <div class="modal-header">
-      <span class="modal-title">Asignar Cuidador</span>
-      <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-cuid')">
-        <i data-lucide="x" style="width:16px;height:16px;"></i>
-      </button>
-    </div>
-    <form id="form-cuid" method="POST" action="">
-      <div class="modal-body">
-        <p id="cuid-info" style="font-size:13px;color:#5D6D7E;margin-bottom:14px;"></p>
-        <div class="form-group">
-          <label class="form-label">Cuidador *</label>
-          <select class="form-control" name="id_cuidador" required>
-            <option value="">— Seleccionar —</option>
-            {% for c in cuidadores %}
-            <option value="{{ c[0] }}">{{ c[1] }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="form-group" style="display:flex;align-items:center;gap:10px;margin-top:4px;">
-          <input type="checkbox" id="chk-principal" name="principal" value="1"
-            style="width:16px;height:16px;cursor:pointer;"/>
-          <label for="chk-principal" class="form-label" style="margin:0;cursor:pointer;">
-            Marcar como cuidador principal
-          </label>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-cuid')">Cancelar</button>
-        <button type="submit" class="btn btn-primary">
-          <i data-lucide="save" style="width:14px;height:14px;"></i> Asignar
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
 {% endblock %}
 {% block scripts %}<script>
 lucide.createIcons();
@@ -267,23 +184,6 @@ function openConfirm(id, nombre) {
   document.getElementById('del-id-pac').value    = id;
   document.getElementById('confirm-nombre').textContent = '¿Desactivar a ' + nombre + '?';
   openModal('modal-confirm');
-  lucide.createIcons();
-}
-
-function openAsignarDx(idPac, nombre) {
-  document.getElementById('dx-info').textContent = 'Paciente: ' + nombre;
-  document.getElementById('form-dx').action =
-    '/admin/pacientes/' + idPac + '/asignar-diagnostico';
-  openModal('modal-dx');
-  lucide.createIcons();
-}
-
-function openAsignarCuid(idPac, nombre) {
-  document.getElementById('cuid-info').textContent = 'Paciente: ' + nombre;
-  document.getElementById('form-cuid').action =
-    '/admin/pacientes/' + idPac + '/asignar-cuidador';
-  document.getElementById('chk-principal').checked = false;
-  openModal('modal-cuid');
   lucide.createIcons();
 }
 

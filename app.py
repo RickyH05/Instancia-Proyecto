@@ -239,31 +239,18 @@ def admin_dashboard():
         carga = cur.fetchall()
         conn.commit()
 
-        # conteos directos (no tienen SP equivalente)
-        cur.execute("SELECT COUNT(*) FROM medico WHERE activo = TRUE")
-        total_medicos = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM cuidador")
-        total_cuidadores = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM paciente WHERE activo = TRUE")
-        total_pacientes = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM medicamento WHERE activo = TRUE")
-        total_medicamentos = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM gps_imei WHERE activo = TRUE")
-        total_gps = cur.fetchone()[0]
-
-        cur.execute("SELECT COUNT(*) FROM beacon WHERE activo = TRUE")
-        total_beacons = cur.fetchone()[0]
-
-        cur.execute("""
-            SELECT COUNT(*) FROM alerta a
-            JOIN estado_alerta ea ON ea.id_estado = a.id_estado
-            WHERE UPPER(ea.descripcion) = 'PENDIENTE'
-        """)
-        total_alertas = cur.fetchone()[0]
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_conteos_admin('cur_conteos')")
+        cur.execute("FETCH ALL FROM cur_conteos")
+        row = cur.fetchone()
+        conn.commit()
+        total_medicos            = row[0]
+        total_cuidadores         = row[1]
+        total_pacientes          = row[2]
+        total_medicamentos       = row[3]
+        total_gps                = row[4]
+        total_beacons            = row[5]
+        total_alertas            = row[6]
 
         # actividad reciente de auditoría
         cur.execute("BEGIN")
@@ -339,18 +326,16 @@ def admin_medicos():
 
         return redirect(url_for("admin_medicos"))
 
-    # GET — listado directo (no existe sp_rep_* para listar todos los médicos)
+    # GET
     medicos = []
     try:
         conn, cur = _admin_db()
-        cur.execute("""
-            SELECT id_medico, nombre, apellido_p, COALESCE(apellido_m,'') AS apellido_m,
-                   COALESCE(cedula_profesional,'') AS cedula,
-                   COALESCE(email,'') AS email, activo,
-                   COALESCE(foto_perfil,'') AS foto_perfil
-            FROM medico ORDER BY apellido_p, nombre
-        """)
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_medico('L', NULL, NULL, NULL, 'cur_med_l')")
+        _, p_ok, p_msg = cur.fetchone()
+        cur.execute("FETCH ALL FROM cur_med_l")
         medicos = cur.fetchall()
+        conn.commit()
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar médicos: {e}", "danger")
@@ -413,14 +398,12 @@ def admin_cuidadores():
     cuidadores = []
     try:
         conn, cur = _admin_db()
-        cur.execute("""
-            SELECT id_cuidador, nombre, apellido_p, COALESCE(apellido_m,'') AS apellido_m,
-                   tipo_cuidador, COALESCE(telefono,'') AS telefono,
-                   COALESCE(email,'') AS email, activo,
-                   COALESCE(foto_perfil,'') AS foto_perfil
-            FROM cuidador ORDER BY apellido_p, nombre
-        """)
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_cuidador('L', NULL, NULL, NULL, 'cur_cuid_l')")
+        _, p_ok, p_msg = cur.fetchone()
+        cur.execute("FETCH ALL FROM cur_cuid_l")
         cuidadores = cur.fetchall()
+        conn.commit()
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar cuidadores: {e}", "danger")
@@ -478,85 +461,18 @@ def admin_pacientes():
         return redirect(url_for("admin_pacientes"))
 
     # GET
-    pacientes    = []
-    diagnosticos = []
-    cuidadores   = []
+    pacientes = []
     try:
         conn, cur = _admin_db()
-
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_paciente('L', NULL, NULL, NULL, 'cur_pac_l')")
         cur.execute("FETCH ALL FROM cur_pac_l")
         pacientes = cur.fetchall()
         conn.commit()
-
-        cur.execute("BEGIN")
-        cur.execute("CALL sp_gestion_diagnostico('L', NULL, NULL, NULL, 'cur_diag_l')")
-        cur.execute("FETCH ALL FROM cur_diag_l")
-        diagnosticos = cur.fetchall()
-        conn.commit()
-
-        cur.execute("BEGIN")
-        cur.execute("CALL sp_gestion_cuidador('L', NULL, NULL, NULL, 'cur_cuid_l')")
-        cur.execute("FETCH ALL FROM cur_cuid_l")
-        cuidadores = cur.fetchall()
-        conn.commit()
-
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar pacientes: {e}", "danger")
-    return render_template("admin/pacientes.html",
-                           pacientes=pacientes,
-                           diagnosticos=diagnosticos,
-                           cuidadores=cuidadores)
-
-
-# ─── Asignaciones rápidas desde la vista de pacientes ───────────────────────
-
-@app.route("/admin/pacientes/<int:id_pac>/asignar-diagnostico", methods=["POST"])
-@login_requerido
-@rol_requerido("admin")
-def admin_paciente_asignar_diagnostico(id_pac):
-    id_diag = request.form.get("id_diagnostico", type=int)
-    if not id_diag:
-        flash("Selecciona un diagnóstico.", "danger")
-        return redirect(url_for("admin_pacientes"))
-    try:
-        conn, cur = _admin_db()
-        cur.execute("BEGIN")
-        cur.execute("CALL sp_asignar_diagnostico(%s, %s, NULL, NULL, 'cur_asig_diag')", [id_pac, id_diag])
-        _row = cur.fetchone()
-        p_ok, p_msg = _row[1], _row[2]
-        conn.commit()
-        cur.close(); conn.close()
-        flash(p_msg, "success" if p_ok == 1 else "danger")
-    except Exception as e:
-        flash(f"Error: {e}", "danger")
-    return redirect(url_for("admin_pacientes"))
-
-
-@app.route("/admin/pacientes/<int:id_pac>/asignar-cuidador", methods=["POST"])
-@login_requerido
-@rol_requerido("admin")
-def admin_paciente_asignar_cuidador(id_pac):
-    id_cuid  = request.form.get("id_cuidador", type=int)
-    principal = request.form.get("principal") == "1"
-    if not id_cuid:
-        flash("Selecciona un cuidador.", "danger")
-        return redirect(url_for("admin_pacientes"))
-    try:
-        conn, cur = _admin_db()
-        cur.execute("BEGIN")
-        cur.execute("CALL sp_asignar_cuidador(%s, %s, NULL, NULL, 'cur_asig_cuid', %s)",
-                    [id_pac, id_cuid, principal])
-        _row = cur.fetchone()
-        p_ok, p_msg = _row[1], _row[2]
-        conn.commit()
-        cur.close(); conn.close()
-        flash(p_msg, "success" if p_ok == 1 else "danger")
-    except Exception as e:
-        flash(f"Error: {e}", "danger")
-    return redirect(url_for("admin_pacientes"))
+    return render_template("admin/pacientes.html", pacientes=pacientes)
 
 
 # ═══════════════════════════════════════════════════════
@@ -611,16 +527,20 @@ def admin_medicamentos():
     unidades = []
     try:
         conn, cur = _admin_db()
-        cur.execute("""
-            SELECT m.id_medicamento, m.nombre_generico, m.codigo_atc,
-                   m.dosis_max, u.descripcion AS unidad, m.id_unidad
-            FROM medicamento m
-            LEFT JOIN unidad_dosis u ON u.id_unidad = m.id_unidad
-            ORDER BY m.nombre_generico
-        """)
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_medicamento('L', NULL, NULL, NULL, 'cur_med_l')")
+        _, p_ok, p_msg = cur.fetchone()
+        cur.execute("FETCH ALL FROM cur_med_l")
         medicamentos = cur.fetchall()
-        cur.execute("SELECT id_unidad, descripcion FROM unidad_dosis ORDER BY descripcion")
+        conn.commit()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_unidades_dosis('cur_uni')")
+        cur.execute("FETCH ALL FROM cur_uni")
         unidades = cur.fetchall()
+        conn.commit()
+
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar medicamentos: {e}", "danger")
@@ -667,12 +587,16 @@ def admin_diagnosticos():
 
         return redirect(url_for("admin_diagnosticos"))
 
-    # GET — SELECT directo: no existe view para listar diagnósticos (excepción aceptada)
+    # GET
     diagnosticos = []
     try:
         conn, cur = _admin_db()
-        cur.execute("SELECT id_diagnostico, descripcion FROM diagnostico ORDER BY descripcion")
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_diagnostico('L', NULL, NULL, NULL, 'cur_diag_l')")
+        _, p_ok, p_msg = cur.fetchone()
+        cur.execute("FETCH ALL FROM cur_diag_l")
         diagnosticos = cur.fetchall()
+        conn.commit()
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar diagnósticos: {e}", "danger")
@@ -719,12 +643,16 @@ def admin_especialidades():
 
         return redirect(url_for("admin_especialidades"))
 
-    # GET — SELECT directo: no existe view para listar especialidades (excepción aceptada)
+    # GET
     especialidades = []
     try:
         conn, cur = _admin_db()
-        cur.execute("SELECT id_especialidad, descripcion FROM especialidad ORDER BY descripcion")
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_especialidad('L', NULL, NULL, NULL, 'cur_esp_l')")
+        _, p_ok, p_msg = cur.fetchone()
+        cur.execute("FETCH ALL FROM cur_esp_l")
         especialidades = cur.fetchall()
+        conn.commit()
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar especialidades: {e}", "danger")
@@ -791,13 +719,12 @@ def admin_beacon():
         # cols: tipo, id_disp, ident, nombre, asignado, activo
         beacons = [r[1:] for r in cur.fetchall() if r[0] == 'BEACON']
         conn.commit()
-        # listado de pacientes (no tiene SP equivalente)
-        cur.execute("""
-            SELECT id_paciente,
-                   nombre || ' ' || apellido_p || ' ' || COALESCE(apellido_m,'') AS nombre_completo
-            FROM paciente WHERE activo = TRUE ORDER BY apellido_p, nombre
-        """)
-        pacientes = cur.fetchall()
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_paciente('L', NULL, NULL, NULL, 'cur_pac_l')")
+        _, p_ok, p_msg = cur.fetchone()
+        cur.execute("FETCH ALL FROM cur_pac_l")
+        pacientes = [(r[0], f"{r[1]} {r[2]} {r[3] or ''}".strip()) for r in cur.fetchall()]
+        conn.commit()
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar beacons: {e}", "danger")
@@ -861,13 +788,11 @@ def admin_gps():
         # cols: tipo, id_disp, ident, nombre, asignado, activo
         gps_lista = [r[1:] for r in cur.fetchall() if r[0] == 'GPS']
         conn.commit()
-        # listado de cuidadores (no tiene SP equivalente)
-        cur.execute("""
-            SELECT id_cuidador,
-                   nombre || ' ' || apellido_p || ' ' || COALESCE(apellido_m,'') AS nombre_completo
-            FROM cuidador ORDER BY apellido_p, nombre
-        """)
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_lista_cuidadores('cur_cuid')")
+        cur.execute("FETCH ALL FROM cur_cuid")
         cuidadores = cur.fetchall()
+        conn.commit()
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar GPS: {e}", "danger")
@@ -905,11 +830,10 @@ def admin_dispositivos():
 @login_requerido
 @rol_requerido("admin")
 def admin_usuarios():
-    """Crear usuarios del sistema — sp_crear_usuario_admin."""
     if request.method == "POST":
         email    = request.form.get("email",    "").strip()
         password = request.form.get("password", "").strip()
-        rol      = request.form.get("rol",      "").strip()   # 'medico' | 'cuidador'
+        rol      = request.form.get("rol",      "").strip()
         id_rol   = request.form.get("id_rol",   None, type=int)
 
         if not email or not password or not rol or not id_rol:
@@ -924,7 +848,7 @@ def admin_usuarios():
                         [str(session["user_id"])])
             cur.execute("BEGIN")
             cur.execute(
-                "CALL sp_crear_usuario_admin(%s, %s, %s::rol_usuario_enum, %s, NULL, NULL, 'cur_usr')",
+                "CALL sp_crear_usuario_admin(%s, %s, %s::rol_usuario_enum, %s, NULL, NULL, 'cur_cu')",
                 [email, password_hash, rol, id_rol],
             )
             p_ok, p_msg, _ = cur.fetchone()
@@ -936,87 +860,141 @@ def admin_usuarios():
 
         return redirect(url_for("admin_usuarios"))
 
-    # GET — SELECT directo: no existe view para listar usuarios (excepción aceptada)
-    usuarios = []
+    # GET
+    usuarios   = []
+    medicos    = []
+    cuidadores = []
     try:
         conn, cur = _admin_db()
-        cur.execute("""
-            SELECT id_usuario, email, rol_usuario,
-                   COALESCE(id_medico::TEXT, id_cuidador::TEXT) AS id_rol,
-                   activo, ultimo_acceso
-            FROM usuario
-            ORDER BY rol_usuario, email
-        """)
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_lista_usuarios('cur_lu')")
+        cur.execute("FETCH ALL FROM cur_lu")
         usuarios = cur.fetchall()
+        conn.commit()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_carga_medicos('cur_med')")
+        cur.execute("FETCH ALL FROM cur_med")
+        medicos = cur.fetchall()
+        conn.commit()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_lista_cuidadores('cur_cuid')")
+        cur.execute("FETCH ALL FROM cur_cuid")
+        cuidadores = cur.fetchall()
+        conn.commit()
+
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar usuarios: {e}", "danger")
-    return render_template("admin/usuarios.html", usuarios=usuarios)
+    return render_template("admin/usuarios.html",
+                           usuarios=usuarios, medicos=medicos, cuidadores=cuidadores)
 
 
-# ═══════════════════════════════════════════════════════
-# ADMIN — Asignaciones
-# ═══════════════════════════════════════════════════════
-
-@app.route("/admin/asignaciones/cuidador", methods=["POST"])
+@app.route("/admin/usuarios/<int:id_usr>/desactivar", methods=["POST"])
 @login_requerido
 @rol_requerido("admin")
-def admin_asignar_cuidador():
-    """Asigna un cuidador a un paciente — sp_asignar_cuidador."""
-    id_pac  = request.form.get("id_paciente",  None, type=int)
-    id_c    = request.form.get("id_cuidador",  None, type=int)
-    princ   = request.form.get("principal", "false").lower() == "true"
-
-    if not id_pac or not id_c:
-        flash("Paciente y cuidador son obligatorios.", "danger")
-        return redirect(url_for("admin_pacientes"))
-
+def admin_usuario_desactivar(id_usr):
     try:
         conn, cur = _admin_db()
+        cur.execute("SELECT set_config('medi_nfc2.id_usuario_app', %s, TRUE)",
+                    [str(session["user_id"])])
         cur.execute("BEGIN")
-        cur.execute(
-            "CALL sp_asignar_cuidador(%s, %s, NULL, NULL, 'cur_asig_c2', %s)",
-            [id_pac, id_c, princ],
-        )
-        _row = cur.fetchone()
-        p_ok, p_msg = _row[1], _row[2]
+        cur.execute("CALL sp_gestion_usuario('D', %s, NULL, NULL, 'cur_du')", [id_usr])
+        p_ok, p_msg = cur.fetchone()[:2]
         conn.commit()
         cur.close(); conn.close()
         flash(p_msg, "success" if p_ok == 1 else "danger")
     except Exception as e:
         flash(f"Error: {e}", "danger")
+    return redirect(url_for("admin_usuarios"))
 
-    return redirect(url_for("admin_pacientes"))
 
-
-@app.route("/admin/asignaciones/diagnostico", methods=["POST"])
+@app.route("/admin/usuarios/<int:id_usr>/activar", methods=["POST"])
 @login_requerido
 @rol_requerido("admin")
-def admin_asignar_diagnostico():
-    """Asigna un diagnóstico a un paciente — sp_asignar_diagnostico."""
-    id_pac  = request.form.get("id_paciente",   None, type=int)
-    id_diag = request.form.get("id_diagnostico",None, type=int)
-
-    if not id_pac or not id_diag:
-        flash("Paciente y diagnóstico son obligatorios.", "danger")
-        return redirect(url_for("admin_pacientes"))
-
+def admin_usuario_activar(id_usr):
     try:
         conn, cur = _admin_db()
+        cur.execute("SELECT set_config('medi_nfc2.id_usuario_app', %s, TRUE)",
+                    [str(session["user_id"])])
         cur.execute("BEGIN")
-        cur.execute(
-            "CALL sp_asignar_diagnostico(%s, %s, NULL, NULL, 'cur_asig_d2')",
-            [id_pac, id_diag],
-        )
-        _row = cur.fetchone()
-        p_ok, p_msg = _row[1], _row[2]
+        cur.execute("CALL sp_gestion_usuario('A', %s, NULL, NULL, 'cur_au')", [id_usr])
+        p_ok, p_msg = cur.fetchone()[:2]
         conn.commit()
         cur.close(); conn.close()
         flash(p_msg, "success" if p_ok == 1 else "danger")
     except Exception as e:
         flash(f"Error: {e}", "danger")
+    return redirect(url_for("admin_usuarios"))
 
-    return redirect(url_for("admin_pacientes"))
+
+@app.route("/admin/usuarios/<int:id_usr>/editar", methods=["GET", "POST"])
+@login_requerido
+@rol_requerido("admin")
+def admin_usuario_editar(id_usr):
+    if request.method == "POST":
+        email    = request.form.get("email", "").strip() or None
+        password = request.form.get("password", "").strip()
+        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode() if password else None
+
+        try:
+            conn, cur = _admin_db()
+            cur.execute("SELECT set_config('medi_nfc2.id_usuario_app', %s, TRUE)",
+                        [str(session["user_id"])])
+            cur.execute("BEGIN")
+            cur.execute(
+                "CALL sp_gestion_usuario('U', %s, NULL, NULL, 'cur_eu', %s, %s)",
+                [id_usr, email, password_hash],
+            )
+            p_ok, p_msg = cur.fetchone()[:2]
+            conn.commit()
+            cur.close(); conn.close()
+            flash(p_msg, "success" if p_ok == 1 else "danger")
+        except Exception as e:
+            flash(f"Error: {e}", "danger")
+
+        return redirect(url_for("admin_usuarios"))
+
+    # GET
+    usuario    = None
+    medicos    = []
+    cuidadores = []
+    try:
+        conn, cur = _admin_db()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_lista_usuarios('cur_lu2')")
+        cur.execute("FETCH ALL FROM cur_lu2")
+        for row in cur.fetchall():
+            if row[0] == id_usr:
+                usuario = row
+                break
+        conn.commit()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_carga_medicos('cur_med2')")
+        cur.execute("FETCH ALL FROM cur_med2")
+        medicos = cur.fetchall()
+        conn.commit()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_lista_cuidadores('cur_cuid2')")
+        cur.execute("FETCH ALL FROM cur_cuid2")
+        cuidadores = cur.fetchall()
+        conn.commit()
+
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar usuario: {e}", "danger")
+
+    if not usuario:
+        flash("Usuario no encontrado.", "danger")
+        return redirect(url_for("admin_usuarios"))
+
+    return render_template("admin/usuario_editar.html",
+                           usuario=usuario, medicos=medicos, cuidadores=cuidadores)
 
 
 @app.route("/admin/asignaciones/especialidad", methods=["POST"])
@@ -1096,6 +1074,164 @@ def admin_supervision():
     except Exception as e:
         flash(f"Error al cargar supervisión: {e}", "danger")
     return render_template("admin/supervision.html", filas=filas)
+
+
+# ═══════════════════════════════════════════════════════
+# ADMIN — Supervisión Ampliada
+# ═══════════════════════════════════════════════════════
+
+@app.route("/admin/supervision/detalle")
+@login_requerido
+@rol_requerido("admin")
+def admin_supervision_detalle():
+    pacientes = {}
+    medicos = []
+    cuidadores = []
+    try:
+        conn, cur = _admin_db()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_supervision('cur_sv')")
+        cur.execute("FETCH ALL FROM cur_sv")
+        for f in cur.fetchall():
+            id_pac = f[0]
+            if id_pac not in pacientes:
+                pacientes[id_pac] = {'nombre': f[1], 'medicos': set(), 'recetas_vigentes': 0}
+            if f[3]:
+                pacientes[id_pac]['medicos'].add(f[3])
+            if f[5] == 'vigente':
+                pacientes[id_pac]['recetas_vigentes'] += 1
+        conn.commit()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_carga_medicos('cur_med')")
+        cur.execute("FETCH ALL FROM cur_med")
+        medicos = cur.fetchall()
+        conn.commit()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_lista_cuidadores('cur_cuid')")
+        cur.execute("FETCH ALL FROM cur_cuid")
+        cuidadores = cur.fetchall()
+        conn.commit()
+
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar supervisión ampliada: {e}", "danger")
+    return render_template("admin/supervision_detalle.html",
+                           pacientes=pacientes, medicos=medicos, cuidadores=cuidadores)
+
+
+@app.route("/admin/supervision/detalle/paciente/<int:id_pac>")
+@login_requerido
+@rol_requerido("admin")
+def admin_sup_paciente(id_pac):
+    paciente_nombre = ""
+    medico = ""
+    cuidadores = []
+    recetas = {}
+    try:
+        conn, cur = _admin_db()
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_detalle_paciente_admin('cur_dp', %s)", [id_pac])
+        cur.execute("FETCH ALL FROM cur_dp")
+        filas = cur.fetchall()
+        conn.commit()
+        cur.close(); conn.close()
+
+        seen_cuidadores = {}
+        for f in filas:
+            if not paciente_nombre:
+                paciente_nombre = f[1]
+            if not medico and f[3]:
+                medico = f[3]
+            id_cuid = f[4]
+            if id_cuid and id_cuid not in seen_cuidadores:
+                seen_cuidadores[id_cuid] = {'nombre': f[5], 'es_principal': f[6]}
+            id_rec = f[7]
+            if id_rec:
+                if id_rec not in recetas:
+                    recetas[id_rec] = {'estado': f[8], 'fecha_inicio': f[9],
+                                       'fecha_fin': f[10], 'meds': []}
+                if f[11]:
+                    med_str = f"{f[11]} {f[12]} {f[13]} c/{f[14]}h"
+                    if med_str not in recetas[id_rec]['meds']:
+                        recetas[id_rec]['meds'].append(med_str)
+        cuidadores = list(seen_cuidadores.values())
+    except Exception as e:
+        flash(f"Error al cargar detalle paciente: {e}", "danger")
+    return render_template("admin/sup_paciente.html",
+                           paciente_nombre=paciente_nombre, medico=medico,
+                           cuidadores=cuidadores, recetas=recetas)
+
+
+@app.route("/admin/supervision/detalle/medico/<int:id_med>")
+@login_requerido
+@rol_requerido("admin")
+def admin_sup_medico(id_med):
+    medico_nombre = ""
+    pacientes = {}
+    try:
+        conn, cur = _admin_db()
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_pacientes_medico_admin('cur_dm', %s)", [id_med])
+        cur.execute("FETCH ALL FROM cur_dm")
+        filas = cur.fetchall()
+        conn.commit()
+        cur.close(); conn.close()
+
+        for f in filas:
+            if not medico_nombre:
+                medico_nombre = f[1]
+            id_pac = f[2]
+            if id_pac not in pacientes:
+                pacientes[id_pac] = {'nombre': f[3], 'cuidador': f[4] or 'Sin cuidador', 'recetas': {}}
+            id_rec = f[5]
+            if id_rec:
+                if id_rec not in pacientes[id_pac]['recetas']:
+                    pacientes[id_pac]['recetas'][id_rec] = {'estado': f[6], 'meds': []}
+                if f[9]:
+                    med_str = f"{f[9]} {f[10]} {f[11]} c/{f[12]}h"
+                    if med_str not in pacientes[id_pac]['recetas'][id_rec]['meds']:
+                        pacientes[id_pac]['recetas'][id_rec]['meds'].append(med_str)
+    except Exception as e:
+        flash(f"Error al cargar detalle médico: {e}", "danger")
+    return render_template("admin/sup_medico.html",
+                           medico=medico_nombre, pacientes=pacientes)
+
+
+@app.route("/admin/supervision/detalle/cuidador/<int:id_cuid>")
+@login_requerido
+@rol_requerido("admin")
+def admin_sup_cuidador(id_cuid):
+    cuidador_nombre = ""
+    pacientes = {}
+    try:
+        conn, cur = _admin_db()
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_pacientes_cuidador_admin('cur_dc', %s)", [id_cuid])
+        cur.execute("FETCH ALL FROM cur_dc")
+        filas = cur.fetchall()
+        conn.commit()
+        cur.close(); conn.close()
+
+        for f in filas:
+            if not cuidador_nombre:
+                cuidador_nombre = f[1]
+            id_pac = f[2]
+            if id_pac not in pacientes:
+                pacientes[id_pac] = {
+                    'nombre': f[3], 'es_principal': f[4],
+                    'medico': f[5], 'medicamentos': [], 'estado_receta': f[7]
+                }
+            if f[8]:
+                med_str = f"{f[8]} {f[9]} {f[10]} c/{f[11]}h"
+                if med_str not in pacientes[id_pac]['medicamentos']:
+                    pacientes[id_pac]['medicamentos'].append(med_str)
+    except Exception as e:
+        flash(f"Error al cargar detalle cuidador: {e}", "danger")
+    return render_template("admin/sup_cuidador.html",
+                           cuidador=cuidador_nombre, pacientes=pacientes)
 
 
 # ═══════════════════════════════════════════════════════
@@ -1496,9 +1632,12 @@ def doctor_paciente_perfil(id):
                 "pct":          None,
                 "foto":         "",
             }
-            cur.execute("SELECT foto_perfil FROM paciente WHERE id_paciente = %s", [r[0]])
-            fp = cur.fetchone()
-            paciente["foto"] = fp[0] or "" if fp else ""
+            cur.execute("BEGIN")
+            cur.execute("CALL sp_rep_perfil_paciente_foto('cur_perf', %s)", [r[0]])
+            cur.execute("FETCH ALL FROM cur_perf")
+            fp_row = cur.fetchone()
+            conn.commit()
+            paciente["foto"] = fp_row[7] or "" if fp_row else ""
 
         # ── sp_rep_adherencia_pacientes_medico → pct del paciente ────────────
         # cols: id_paciente, paciente, medicamento, total, ok, tarde, omitida, pend, pct
@@ -2290,13 +2429,13 @@ def doctor_receta_desde_lista():
             uid = nfc_uids[i] if i < len(nfc_uids) else ''
             if uid.strip():
                 nombre_med = med_nombres.get(str(mid), str(mid))
-                cur.execute("""
-                    INSERT INTO etiqueta_nfc
-                        (uid_nfc, nombre, fecha_registro, tipo_etiqueta,
-                         id_receta_medicamento, estado_etiqueta)
-                    VALUES (%s, %s, NOW(), 'medicamento', %s, 'activo')
-                    ON CONFLICT (uid_nfc) DO NOTHING
-                """, [uid.strip(), f"{nombre_med} - Paciente", p_id_rm])
+                cur.execute("BEGIN")
+                cur.execute(
+                    "CALL sp_gestion_etiqueta_nfc('I', %s, NULL, NULL, 'cur_nfc', %s, %s, %s, %s)",
+                    [uid.strip(), f"{nombre_med} - Paciente", 'medicamento', p_id_rm, 'activo'],
+                )
+                p_uid, p_ok, p_msg = cur.fetchone()
+                cur.execute("FETCH ALL FROM cur_nfc")
                 conn.commit()
         cur.close(); conn.close()
         flash("Receta creada correctamente.", "success")
@@ -2452,25 +2591,33 @@ def doctor_proximidad_historial():
     try:
         conn = get_db()
         cur  = conn.cursor()
-        cur.execute("""
-            SELECT p.nombre || ' ' || p.apellido_p AS paciente,
-                   vht.medicamento, vht.cuidador, vht.timestamp_lectura,
-                   vht.distancia_metros, vht.proximidad_valida
-            FROM v_historial_tomas vht
-            JOIN paciente p ON p.id_paciente = vht.id_paciente
-            WHERE vht.id_paciente IN (
-                SELECT DISTINCT r.id_paciente FROM receta r WHERE r.id_medico = %s
-            )
-            ORDER BY vht.timestamp_lectura DESC
-            LIMIT 100
-        """, [id_medico])
-        for r in cur.fetchall():
-            pac, med, cuid, ts, dist, valida = r
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_mapa_medico('cur_mapa', %s)", [id_medico])
+        cur.execute("FETCH ALL FROM cur_mapa")
+        mapa_rows = cur.fetchall()
+        conn.commit()
+        # cols: 0=id_medico, 1=id_paciente, 2=paciente, 3=id_beacon,
+        #       4=bec_lat, 5=bec_lon, 6=radio_metros, 7=gps_lat, 8=gps_lon,
+        #       9=gps_ts, 10=cuidador
+        id_pacientes = list({r[1] for r in mapa_rows})
+        historial_prox = []
+        for id_pac in id_pacientes:
+            cur.execute("BEGIN")
+            cur.execute("CALL sp_rep_historial_tomas('cur_hist', %s, 7)", [id_pac])
+            cur.execute("FETCH ALL FROM cur_hist")
+            historial_prox.extend(cur.fetchall())
+            conn.commit()
+        # cols historial: 0=id_paciente, 2=timestamp_lectura, 9=medicamento,
+        #                 10=cuidador, 11=distancia_metros, 12=proximidad_valida
+        pac_nombre = {r[1]: r[2] for r in mapa_rows}
+        for r in historial_prox:
+            dist  = r[11]
+            valida = r[12]
             eventos.append({
-                "pac":   pac,
-                "med":   med or "—",
-                "cuid":  cuid or "—",
-                "ts":    str(ts)[:16],
+                "pac":   pac_nombre.get(r[0], "—"),
+                "med":   r[9] or "—",
+                "cuid":  r[10] or "—",
+                "ts":    str(r[2])[:16],
                 "dist":  f"{dist:.1f}m" if dist is not None else "—",
                 "valida": bool(valida),
             })
@@ -2560,25 +2707,19 @@ def cuidador_home():
 
         # ── GPS del cuidador (resumen para home) ─────────────────────────────
         gps_resumen = None
-        cur.execute("""
-            SELECT g.imei, g.modelo, g.activo,
-                   u.latitud, u.longitud, u.timestamp_ubicacion
-            FROM gps_imei g
-            LEFT JOIN ubicacion_gps u ON u.id_gps = g.id_gps
-            WHERE g.id_cuidador = %s AND g.activo = TRUE
-            ORDER BY u.timestamp_ubicacion DESC NULLS LAST
-            LIMIT 1
-        """, [id_cuidador])
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_gps_cuidador('cur_gps', %s)", [id_cuidador])
+        cur.execute("FETCH ALL FROM cur_gps")
         gps_row = cur.fetchone()
+        conn.commit()
         if gps_row:
-            imei, modelo, activo, lat, lon, ts_ub = gps_row
             gps_resumen = {
-                "imei":   imei,
-                "modelo": modelo,
-                "activo": activo,
-                "lat":    lat,
-                "lon":    lon,
-                "ts":     str(ts_ub)[11:16] if ts_ub else None,
+                "imei":   gps_row[1],
+                "modelo": gps_row[2],
+                "activo": gps_row[3],
+                "lat":    gps_row[5],
+                "lon":    gps_row[6],
+                "ts":     str(gps_row[7])[11:16] if gps_row[7] else None,
             }
 
         cur.close()
@@ -2651,9 +2792,12 @@ def cuidador_paciente(id):
             paciente["nombre"]       = f"{r[1]} {r[2]} {r[3] or ''}".strip()
             paciente["diagnosticos"] = r[7] or ""
 
-        cur.execute("SELECT foto_perfil FROM paciente WHERE id_paciente = %s", [id])
-        fp = cur.fetchone()
-        paciente["foto"] = fp[0] or "" if fp else ""
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_perfil_paciente_foto('cur_foto_beacon', %s)", [id])
+        cur.execute("FETCH ALL FROM cur_foto_beacon")
+        fp_row = cur.fetchone()
+        conn.commit()
+        paciente["foto"] = fp_row[7] or "" if fp_row else ""
 
         cur.close()
         conn.close()
@@ -2817,28 +2961,33 @@ def cuidador_historial():
     try:
         conn = get_db()
         cur  = conn.cursor()
-        cur.execute("""
-            SELECT p.nombre || ' ' || p.apellido_p AS paciente,
-                   vht.id_evento, vht.timestamp_lectura, vht.medicamento,
-                   vht.resultado, vht.origen
-            FROM v_historial_tomas vht
-            JOIN paciente p ON p.id_paciente = vht.id_paciente
-            WHERE vht.id_paciente IN (
-                SELECT id_paciente FROM paciente_cuidador
-                WHERE id_cuidador = %s AND activo = TRUE
-            )
-            ORDER BY vht.timestamp_lectura DESC
-            LIMIT 50
-        """, [id_cuidador])
-        for r in cur.fetchall():
-            pac, id_ev, ts, med, resultado, origen = r
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_dashboard_cuidador('cur_dash', %s)", [id_cuidador])
+        cur.execute("FETCH ALL FROM cur_dash")
+        dashboard_rows = cur.fetchall()
+        conn.commit()
+        # col 1 = id_paciente, col 2 = paciente (nombre)
+        id_pacientes = list({r[1] for r in dashboard_rows})
+        pac_nombre   = {r[1]: r[2] for r in dashboard_rows}
+
+        historial_rows = []
+        for id_pac in id_pacientes:
+            cur_name = f"cur_hist_{id_pac}"
+            cur.execute("BEGIN")
+            cur.execute(f"CALL sp_rep_historial_tomas('{cur_name}', %s, 14)", [id_pac])
+            cur.execute(f"FETCH ALL FROM {cur_name}")
+            historial_rows.extend(cur.fetchall())
+            conn.commit()
+        # cols: 0=id_paciente, 1=id_evento, 2=timestamp_lectura, 4=resultado,
+        #       6=origen, 9=medicamento
+        for r in historial_rows:
             eventos.append({
-                "id":        id_ev,
-                "pac":       pac,
-                "med":       med or "—",
-                "resultado": resultado or "—",
-                "time":      str(ts)[:16],
-                "orig":      "NFC" if (origen or "").lower() == "nfc" else "Manual",
+                "id":        r[1],
+                "pac":       pac_nombre.get(r[0], "—"),
+                "med":       r[9] or "—",
+                "resultado": r[4] or "—",
+                "time":      str(r[2])[:16],
+                "orig":      "NFC" if (r[6] or "").lower() == "nfc" else "Manual",
             })
         stats["ok"]    = sum(1 for e in eventos if e["resultado"] == "Exitoso")
         stats["fuera"] = sum(1 for e in eventos if e["resultado"] == "Tardío")
@@ -2859,13 +3008,13 @@ def cuidador_beacon(id):
         conn = get_db()
         cur  = conn.cursor()
 
-        cur.execute("""
-            SELECT nombre, apellido_p, COALESCE(apellido_m,''), foto_perfil
-            FROM paciente WHERE id_paciente = %s
-        """, [id])
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_perfil_paciente_foto('cur_perf', %s)", [id])
+        cur.execute("FETCH ALL FROM cur_perf")
         row = cur.fetchone()
+        conn.commit()
         if row:
-            nom, ap, am, fp = row
+            nom, ap, am, fp = row[1], row[2], row[3] or '', row[7]
             paciente = {
                 "nombre":    f"{nom} {ap} {am}".strip(),
                 "iniciales": (nom[0] + ap[0]).upper(),
@@ -2910,30 +3059,18 @@ def cuidador_mi_gps():
     try:
         conn = get_db()
         cur  = conn.cursor()
-        cur.execute("""
-            SELECT id_gps, imei, modelo, activo
-            FROM gps_imei
-            WHERE id_cuidador = %s
-            ORDER BY activo DESC LIMIT 1
-        """, [id_cuidador])
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_gps_cuidador('cur_gps', %s)", [id_cuidador])
+        cur.execute("FETCH ALL FROM cur_gps")
         row = cur.fetchone()
+        conn.commit()
         if row:
-            id_gps, imei, modelo, activo = row
-            gps = {"id": id_gps, "imei": imei, "modelo": modelo, "activo": activo}
-            cur.execute("""
-                SELECT latitud, longitud, timestamp_ubicacion
-                FROM ubicacion_gps
-                WHERE id_gps = %s
-                ORDER BY timestamp_ubicacion DESC LIMIT 5
-            """, [id_gps])
-            rows = cur.fetchall()
-            for lat, lon, ts in rows:
-                posiciones.append({"lat": lat, "lon": lon, "ts": str(ts)[11:16]})
-            if posiciones:
-                p0 = posiciones[0]
+            gps = {"id": row[0], "imei": row[1], "modelo": row[2], "activo": row[3]}
+            if row[5] is not None:
+                posiciones.append({"lat": row[5], "lon": row[6], "ts": str(row[7])[11:16]})
                 ultima_ubicacion = {
-                    "lat": p0["lat"], "lon": p0["lon"],
-                    "ts": str(rows[0][2])[:16],
+                    "lat": row[5], "lon": row[6],
+                    "ts": str(row[7])[:16],
                 }
         cur.close(); conn.close()
     except Exception as e:

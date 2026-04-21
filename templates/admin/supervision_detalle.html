@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Supervisión Ampliada{% endblock %}
+{% block page_title %}Supervisión Ampliada{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Supervisión Ampliada</h1><p>Vista detallada de pacientes, médicos y cuidadores</p></div>
+</div>
+
+<!-- SECCIÓN A: Tabla de pacientes -->
+<div class="card" style="margin-bottom:24px;">
+  <div class="card-header" style="padding:16px 20px;border-bottom:1px solid #E5E7EB;">
+    <h2 style="font-size:16px;font-weight:600;margin:0;">Pacientes</h2>
+  </div>
+  <div style="padding:16px 20px;">
+    <div class="search-bar" style="margin-bottom:12px;">
+      <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+      <input id="search-pac" class="form-control" placeholder="Buscar paciente o médico..." oninput="filtrarPacientes()"/>
+    </div>
+    <div class="table-wrap">
+      <table id="tabla-pacientes">
+        <thead><tr>
+          <th>Paciente</th><th>Médico(s)</th><th>Recetas vigentes</th><th>Acción</th>
+        </tr></thead>
+        <tbody>
+          {% for id_pac, info in pacientes.items() %}
+          <tr data-search="{{ info.nombre }} {{ info.medicos | join(' ') }}">
+            <td style="font-weight:500;">{{ info.nombre }}</td>
+            <td style="font-size:13px;color:#5D6D7E;">{{ info.medicos | join(', ') or '—' }}</td>
+            <td>
+              {% if info.recetas_vigentes > 0 %}
+                <span class="badge badge-green">{{ info.recetas_vigentes }}</span>
+              {% else %}
+                <span class="badge badge-yellow">0</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('admin_sup_paciente', id_pac=id_pac) }}"
+                 class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px;">
+                <i data-lucide="eye" style="width:13px;height:13px;"></i> Ver detalle
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="text-align:center;color:#9CA3AF;padding:32px;">Sin registros.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SECCIÓN B: Filtro por médico -->
+<div style="display:flex;gap:16px;flex-wrap:wrap;">
+  <div class="card" style="flex:1;min-width:260px;">
+    <div class="card-header" style="padding:16px 20px;border-bottom:1px solid #E5E7EB;">
+      <h2 style="font-size:16px;font-weight:600;margin:0;">Ver por médico</h2>
+    </div>
+    <div style="padding:16px 20px;display:flex;gap:8px;align-items:flex-end;">
+      <div style="flex:1;">
+        <label style="font-size:13px;color:#6B7280;display:block;margin-bottom:4px;">Seleccionar médico</label>
+        <select id="sel-medico" class="form-control">
+          <option value="">— Selecciona —</option>
+          {% for m in medicos %}
+          <option value="{{ m[0] }}">{{ m[1] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="irMedico()">
+        <i data-lucide="arrow-right" style="width:14px;height:14px;"></i> Ver
+      </button>
+    </div>
+  </div>
+
+  <!-- SECCIÓN C: Filtro por cuidador -->
+  <div class="card" style="flex:1;min-width:260px;">
+    <div class="card-header" style="padding:16px 20px;border-bottom:1px solid #E5E7EB;">
+      <h2 style="font-size:16px;font-weight:600;margin:0;">Ver por cuidador</h2>
+    </div>
+    <div style="padding:16px 20px;display:flex;gap:8px;align-items:flex-end;">
+      <div style="flex:1;">
+        <label style="font-size:13px;color:#6B7280;display:block;margin-bottom:4px;">Seleccionar cuidador</label>
+        <select id="sel-cuidador" class="form-control">
+          <option value="">— Selecciona —</option>
+          {% for c in cuidadores %}
+          <option value="{{ c[0] }}">{{ c[1] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="irCuidador()">
+        <i data-lucide="arrow-right" style="width:14px;height:14px;"></i> Ver
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  lucide.createIcons();
+
+  function filtrarPacientes() {
+    const q = document.getElementById('search-pac').value.toLowerCase();
+    document.querySelectorAll('#tabla-pacientes tbody tr[data-search]').forEach(tr => {
+      tr.style.display = tr.dataset.search.toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+
+  function irMedico() {
+    const v = document.getElementById('sel-medico').value;
+    if (v) window.location.href = '/admin/supervision/detalle/medico/' + v;
+  }
+
+  function irCuidador() {
+    const v = document.getElementById('sel-cuidador').value;
+    if (v) window.location.href = '/admin/supervision/detalle/cuidador/' + v;
+  }
+</script>
+{% endblock %}

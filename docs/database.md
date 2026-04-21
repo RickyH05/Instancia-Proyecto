@@ -159,21 +159,21 @@ p_id, p_ok, p_msg = cur.fetchone()
 **Firma completa:**
 ```sql
 CALL sp_gestion_paciente(
-    p_acc       CHAR(1),              -- 'I'=Insert, 'U'=Update, 'D'=Desactivar
+    p_acc       CHAR(1),              -- 'I'=Insert, 'U'=Update, 'D'=Desactivar, 'L'=Listar activos
     p_id        INTEGER INOUT,        -- NULL en Insert; id del paciente en U/D
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
-    io_cursor   REFCURSOR INOUT,      -- nombre del cursor para filas de resultado
+    io_cursor   REFCURSOR INOUT,
     p_nom       VARCHAR(100) DEFAULT NULL,
-    p_ap        VARCHAR(100) DEFAULT NULL,  -- apellido paterno
-    p_am        VARCHAR(100) DEFAULT NULL,  -- apellido materno
+    p_ap        VARCHAR(100) DEFAULT NULL,
+    p_am        VARCHAR(100) DEFAULT NULL,
     p_nac       DATE         DEFAULT NULL,
     p_curp      VARCHAR(18)  DEFAULT NULL,
-    p_foto      VARCHAR(255) DEFAULT NULL   -- default='default_paciente.png'
+    p_foto      VARCHAR(255) DEFAULT NULL
 )
 ```
 
-**Cursor devuelve:** fila completa del paciente afectado (`id_paciente, nombre, apellido_p, apellido_m, fecha_nacimiento, curp, activo, foto_perfil`)
+**Cursor devuelve:** `id_paciente, nombre, apellido_p, apellido_m, fecha_nacimiento, curp, activo, foto_perfil`
 
 **Ejemplos psycopg:**
 ```python
@@ -205,6 +205,14 @@ cur.execute(
 )
 _, p_ok, p_msg = cur.fetchone()
 conn.commit()
+
+# LISTAR activos
+cur.execute("BEGIN")
+cur.execute("CALL sp_gestion_paciente('L', NULL, NULL, NULL, 'cur1')")
+_, p_ok, p_msg = cur.fetchone()
+cur.execute("FETCH ALL FROM cur1")
+rows = cur.fetchall()
+conn.commit()
 ```
 
 **Notas:**
@@ -221,7 +229,7 @@ conn.commit()
 **Firma completa:**
 ```sql
 CALL sp_gestion_medico(
-    p_acc       CHAR(1),
+    p_acc       CHAR(1),              -- 'I', 'U', 'D', 'L'
     p_id        INTEGER INOUT,
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
@@ -229,8 +237,8 @@ CALL sp_gestion_medico(
     p_nom       VARCHAR(100) DEFAULT NULL,
     p_ap        VARCHAR(100) DEFAULT NULL,
     p_am        VARCHAR(100) DEFAULT NULL,
-    p_ced       VARCHAR(50)  DEFAULT NULL,  -- cédula profesional (UNIQUE)
-    p_email     VARCHAR(150) DEFAULT NULL,  -- email (UNIQUE)
+    p_ced       VARCHAR(50)  DEFAULT NULL,
+    p_email     VARCHAR(150) DEFAULT NULL,
     p_foto      VARCHAR(255) DEFAULT NULL
 )
 ```
@@ -267,7 +275,7 @@ conn.commit()
 **Firma completa:**
 ```sql
 CALL sp_gestion_cuidador(
-    p_acc       CHAR(1),
+    p_acc       CHAR(1),              -- 'I', 'U', 'D', 'L', 'R'
     p_id        INTEGER INOUT,
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
@@ -275,12 +283,19 @@ CALL sp_gestion_cuidador(
     p_nom       VARCHAR(100)       DEFAULT NULL,
     p_ap        VARCHAR(100)       DEFAULT NULL,
     p_am        VARCHAR(100)       DEFAULT NULL,
-    p_tipo      tipo_cuidador_enum DEFAULT NULL,  -- 'formal' | 'informal'
+    p_tipo      tipo_cuidador_enum DEFAULT NULL,
     p_tel       VARCHAR(20)        DEFAULT NULL,
     p_email     VARCHAR(150)       DEFAULT NULL,
     p_foto      VARCHAR(255)       DEFAULT NULL
 )
 ```
+
+**Acciones:**
+- `'I'` — Crear cuidador
+- `'U'` — Actualizar datos
+- `'D'` — Desactiva vínculos en `paciente_cuidador` (NO elimina al cuidador)
+- `'L'` — Listar cuidadores activos
+- `'R'` — Leer uno por `p_id`
 
 **Cursor devuelve:** `id_cuidador, nombre, apellido_p, apellido_m, tipo_cuidador, telefono, email, activo`
 
@@ -305,8 +320,6 @@ _, p_ok, p_msg = cur.fetchone()
 conn.commit()
 ```
 
-**Nota:** `'D'` desactiva al cuidador en `paciente_cuidador`, no en la tabla `cuidador`.
-
 ---
 
 ## 4. CRUD — Medicamento
@@ -316,15 +329,15 @@ conn.commit()
 **Firma completa:**
 ```sql
 CALL sp_gestion_medicamento(
-    p_acc       CHAR(1),
+    p_acc       CHAR(1),              -- 'I', 'U', 'D', 'L'
     p_id        INTEGER INOUT,
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
     io_cursor   REFCURSOR INOUT,
     p_nombre    VARCHAR(150) DEFAULT NULL,
     p_atc       VARCHAR(30)  DEFAULT NULL,
-    p_dmax      INTEGER      DEFAULT NULL,  -- dosis_max (> 0)
-    p_unidad    INTEGER      DEFAULT NULL   -- FK unidad_dosis.id_unidad
+    p_dmax      INTEGER      DEFAULT NULL,
+    p_unidad    INTEGER      DEFAULT NULL
 )
 ```
 
@@ -413,12 +426,12 @@ CALL sp_gestion_beacon(
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
     io_cursor   REFCURSOR INOUT,
-    p_uuid      VARCHAR(50)   DEFAULT NULL,  -- UUID del beacon (UNIQUE)
+    p_uuid      VARCHAR(50)   DEFAULT NULL,
     p_nom       VARCHAR(150)  DEFAULT NULL,
-    p_pac       INTEGER       DEFAULT NULL,  -- FK paciente.id_paciente
-    p_lat       NUMERIC(10,7) DEFAULT NULL,  -- latitud_ref (-90 a 90)
-    p_lon       NUMERIC(10,7) DEFAULT NULL,  -- longitud_ref (-180 a 180)
-    p_radio     NUMERIC(6,2)  DEFAULT 5.00   -- radio en metros (1 a 50)
+    p_pac       INTEGER       DEFAULT NULL,
+    p_lat       NUMERIC(10,7) DEFAULT NULL,
+    p_lon       NUMERIC(10,7) DEFAULT NULL,
+    p_radio     NUMERIC(6,2)  DEFAULT 5.00
 )
 ```
 
@@ -457,9 +470,9 @@ CALL sp_gestion_gps(
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
     io_cursor   REFCURSOR INOUT,
-    p_imei      VARCHAR(20)  DEFAULT NULL,  -- IMEI 15-17 dígitos (UNIQUE)
+    p_imei      VARCHAR(20)  DEFAULT NULL,
     p_mod       VARCHAR(100) DEFAULT NULL,
-    p_cuid      INTEGER      DEFAULT NULL   -- FK cuidador.id_cuidador
+    p_cuid      INTEGER      DEFAULT NULL
 )
 ```
 
@@ -489,11 +502,11 @@ CALL sp_crear_receta(
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
     io_cursor   REFCURSOR INOUT,
-    p_pac       INTEGER,     -- FK paciente.id_paciente
-    p_med       INTEGER,     -- FK medico.id_medico
-    p_emi       DATE,        -- fecha de emisión
-    p_ini       DATE,        -- fecha de inicio (>= p_emi)
-    p_fin       DATE         -- fecha de fin (>= p_ini)
+    p_pac       INTEGER,
+    p_med       INTEGER,
+    p_emi       DATE,
+    p_ini       DATE,
+    p_fin       DATE
 )
 ```
 
@@ -523,13 +536,13 @@ CALL sp_agregar_receta_med(
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
     io_cursor   REFCURSOR INOUT,
-    p_rec       INTEGER,  -- FK receta.id_receta (debe estar 'vigente')
-    p_medic     INTEGER,  -- FK medicamento.id_medicamento
-    p_dosis     INTEGER,  -- no puede exceder dosis_max del medicamento
-    p_freq      INTEGER,  -- frecuencia en horas (ej. 8 = cada 8h, 24 = 1/día)
-    p_tol       INTEGER,  -- tolerancia en minutos
-    p_hora      TIME,     -- hora de la primera toma (ej. '08:00:00')
-    p_uni       INTEGER   -- FK unidad_dosis.id_unidad
+    p_rec       INTEGER,
+    p_medic     INTEGER,
+    p_dosis     INTEGER,
+    p_freq      INTEGER,
+    p_tol       INTEGER,
+    p_hora      TIME,
+    p_uni       INTEGER
 )
 ```
 
@@ -543,7 +556,7 @@ cur.execute(
 )
 p_id_rm, p_ok, p_msg = cur.fetchone()
 cur.execute("FETCH ALL FROM cur1")
-detalle = cur.fetchone()  # incluye agendas_generadas
+detalle = cur.fetchone()
 conn.commit()
 ```
 
@@ -584,7 +597,7 @@ SP principal del flujo operativo. Registra una toma escaneada por NFC.
 1. Valida la etiqueta NFC.
 2. Registra ubicación GPS del cuidador (requiere GPS activo para generar alerta de proximidad).
 3. Calcula distancia al beacon del paciente (Haversine).
-4. Inserta en `evento_nfc` → dispara `trg_antes_evento` (clasifica resultado, detecta duplicado) y `trg_despues_evento` (genera alerta y bitácora).
+4. Inserta en `evento_nfc` → dispara `trg_antes_evento` y `trg_despues_evento`.
 5. Inserta en `evento_proximidad`.
 6. Si GPS verificado y distancia > radio → genera alerta `'Proximidad Inválida'`.
 
@@ -594,13 +607,13 @@ CALL sp_registrar_toma_nfc(
     p_id_ev     BIGINT INOUT,
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
-    p_res       VARCHAR(50) OUT,   -- 'Exitoso'|'Tardío'|'Duplicado'
-    p_prox      BOOLEAN OUT,       -- TRUE si proximidad válida
+    p_res       VARCHAR(50) OUT,
+    p_prox      BOOLEAN OUT,
     io_cursor   REFCURSOR INOUT,
-    p_uid       VARCHAR(100),      -- UID de la etiqueta NFC
-    p_cuid      INTEGER,           -- FK cuidador.id_cuidador
-    p_lat       NUMERIC(10,7),     -- latitud actual del cuidador
-    p_lon       NUMERIC(10,7),     -- longitud actual del cuidador
+    p_uid       VARCHAR(100),
+    p_cuid      INTEGER,
+    p_lat       NUMERIC(10,7),
+    p_lon       NUMERIC(10,7),
     p_prec      NUMERIC(6,2) DEFAULT NULL,
     p_obs       VARCHAR(255) DEFAULT NULL
 )
@@ -691,14 +704,12 @@ if row and bcrypt.checkpw(password.encode(), row[1].encode()):
     session['rol']     = row[2]
     session['id_rol']  = row[3]
     session['nombre']  = row[4]
-    # 3. Registrar acceso exitoso
     cur.execute(
         "INSERT INTO log_acceso (id_usr, email, rol, ip, exitoso) VALUES (%s,%s,%s,%s,TRUE)",
         [row[0], email, row[2], request.remote_addr]
     )
     conn.commit()
 else:
-    # 4. Registrar fallo
     cur.execute(
         "INSERT INTO log_acceso (id_usr, email, rol, ip, exitoso) "
         "SELECT id_usuario, %s, rol_usuario::TEXT, %s, FALSE "
@@ -716,21 +727,20 @@ else:
 
 ### `sp_detectar_omisiones`
 
-Busca todas las `agenda_toma` en `'pendiente'` cuya ventana de tolerancia ya venció,
-las marca como `'omitida'` y genera alertas de tipo "Omisión de Medicamento".
-Ejecutar periódicamente con cron (ej. cada hora).
+Busca todas las `agenda_toma` en `'pendiente'` cuya ventana ya venció,
+las marca como `'omitida'` y genera alertas. Ejecutar con cron (ej. cada hora).
 
 **Firma completa:**
 ```sql
 CALL sp_detectar_omisiones(
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
-    p_total     INTEGER OUT,      -- omisiones detectadas en esta ejecución
+    p_total     INTEGER OUT,
     io_cursor   REFCURSOR INOUT
 )
 ```
 
-**Cursor devuelve:** alertas de omisión generadas en la última hora (`id_alerta, timestamp_gen, paciente, medicamento, toma_programada`)
+**Cursor devuelve:** `id_alerta, timestamp_gen, paciente, medicamento, toma_programada`
 
 ```python
 cur.execute("BEGIN")
@@ -802,9 +812,9 @@ p_ok, p_msg = cur.fetchone()
 conn.commit()
 ```
 
-> **Cambio de cuidador principal (Escenario 4):**
+> **Cambio de cuidador principal:**
 > ```python
-> # 1. Desactivar el cuidador anterior
+> # 1. Desactivar el anterior
 > cur.execute("""
 >     UPDATE paciente_cuidador SET activo = FALSE
 >     WHERE id_paciente = %s AND es_principal = TRUE AND activo = TRUE
@@ -844,6 +854,32 @@ conn.commit()
 
 ---
 
+### `sp_desasignar_cuidador`
+
+Desactiva el vínculo de un cuidador de apoyo (NO se puede desasignar al principal).
+
+**Firma completa:**
+```sql
+CALL sp_desasignar_cuidador(
+    p_id_pac_cuid   INTEGER IN,   -- id_paciente_cuidador
+    p_ok            INTEGER OUT,
+    p_msg           VARCHAR(300) OUT,
+    io_cursor       REFCURSOR INOUT
+)
+```
+
+```python
+cur.execute("BEGIN")
+cur.execute(
+    "CALL sp_desasignar_cuidador(%s, NULL, NULL, 'cur1')",
+    [id_paciente_cuidador]
+)
+p_ok, p_msg = cur.fetchone()
+conn.commit()
+```
+
+---
+
 ## 15. Crear Usuario
 
 ### `sp_crear_usuario_admin`
@@ -852,9 +888,9 @@ conn.commit()
 ```sql
 CALL sp_crear_usuario_admin(
     p_email         VARCHAR(150) IN,
-    p_password_hash TEXT IN,          -- hash bcrypt generado en Flask
-    p_rol           rol_usuario_enum, -- 'medico' | 'cuidador'
-    p_id_rol        INTEGER IN,       -- id_medico o id_cuidador
+    p_password_hash TEXT IN,
+    p_rol           rol_usuario_enum,
+    p_id_rol        INTEGER IN,
     p_ok            INTEGER OUT,
     p_msg           VARCHAR(300) OUT,
     io_cursor       REFCURSOR INOUT
@@ -901,22 +937,51 @@ conn.commit()
 
 ---
 
-## 16. Horario de Cuidador ← NUEVO en v7
+### `sp_gestion_usuario`
+
+Gestión de usuarios existentes: actualizar email/password, activar, desactivar.
+
+**Firma completa:**
+```sql
+CALL sp_gestion_usuario(
+    p_acc           CHAR(1),          -- 'U'=Update, 'D'=Desactivar, 'A'=Activar
+    p_id_usuario    INTEGER IN,
+    p_ok            INTEGER OUT,
+    p_msg           VARCHAR(300) OUT,
+    io_cursor       REFCURSOR INOUT,
+    p_email         VARCHAR(150) DEFAULT NULL,
+    p_password_hash TEXT         DEFAULT NULL
+)
+```
+
+**Cursor devuelve:** `id_usuario, email, rol_usuario, activo, ultimo_acceso`
+
+```python
+# Desactivar usuario
+cur.execute("BEGIN")
+cur.execute("CALL sp_gestion_usuario('D', %s, NULL, NULL, 'cur1')", [id_usuario])
+p_ok, p_msg = cur.fetchone()
+conn.commit()
+```
+
+---
+
+## 16. Horario de Cuidador
 
 ### `sp_gestion_horario`
 
-Gestiona los turnos semanales de un cuidador para un paciente concreto.
-Usa `id_paciente_cuidador` (PK de la tabla `paciente_cuidador`), NO `id_cuidador`.
+Gestiona turnos semanales de un cuidador para un paciente.
+Usa `id_paciente_cuidador` (PK de `paciente_cuidador`), NO `id_cuidador`.
 
 **Firma completa:**
 ```sql
 CALL sp_gestion_horario(
     p_acc       CHAR(1),              -- 'I'=Insertar, 'D'=Eliminar, 'L'=Listar
-    p_id        INTEGER INOUT,        -- NULL en I; id_cuidador_horario en D
+    p_id        INTEGER INOUT,
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
     io_cursor   REFCURSOR INOUT,
-    p_pac_cuid  INTEGER      DEFAULT NULL,  -- FK paciente_cuidador.id_paciente_cuidador
+    p_pac_cuid  INTEGER      DEFAULT NULL,
     p_dia       dia_semana_enum DEFAULT NULL,
     p_inicio    TIME         DEFAULT NULL,
     p_fin       TIME         DEFAULT NULL
@@ -931,9 +996,9 @@ CALL sp_gestion_horario(
 | `'L'` | `p_pac_cuid` | Todos los turnos del vínculo, ordenados por día/hora |
 
 **Validaciones:**
-- `hora_fin` debe ser mayor que `hora_inicio` → `p_ok = -2` si falla.
-- El vínculo `paciente_cuidador` debe existir y estar activo → `p_ok = -3` si no.
-- El horario debe existir para eliminarlo → `p_ok = -4` si no.
+- `hora_fin` > `hora_inicio` → `p_ok = -2`
+- Vínculo debe existir y estar activo → `p_ok = -3`
+- Turno debe existir para eliminarlo → `p_ok = -4`
 
 **Ejemplos psycopg:**
 ```python
@@ -942,8 +1007,7 @@ cur.execute("""
     SELECT id_paciente_cuidador FROM paciente_cuidador
     WHERE id_paciente = %s AND id_cuidador = %s AND activo = TRUE
 """, [id_paciente, id_cuidador])
-row = cur.fetchone()
-id_pc = row[0]
+id_pc = cur.fetchone()[0]
 
 # INSERTAR turno
 cur.execute("BEGIN")
@@ -953,15 +1017,12 @@ cur.execute(
 )
 p_id, p_ok, p_msg = cur.fetchone()
 cur.execute("FETCH ALL FROM cur1")
-turno = cur.fetchone()   # id_cuidador_horario, dia_semana, hora_inicio, hora_fin, cuidador, paciente
+turno = cur.fetchone()
 conn.commit()
 
-# LISTAR todos los turnos de un vínculo
+# LISTAR turnos de un vínculo
 cur.execute("BEGIN")
-cur.execute(
-    "CALL sp_gestion_horario('L', NULL, NULL, NULL, 'cur1', %s)",
-    [id_pc]
-)
+cur.execute("CALL sp_gestion_horario('L', NULL, NULL, NULL, 'cur1', %s)", [id_pc])
 p_id, p_ok, p_msg = cur.fetchone()
 cur.execute("FETCH ALL FROM cur1")
 turnos = cur.fetchall()
@@ -969,10 +1030,7 @@ conn.commit()
 
 # ELIMINAR turno
 cur.execute("BEGIN")
-cur.execute(
-    "CALL sp_gestion_horario('D', %s, NULL, NULL, 'cur1')",
-    [id_cuidador_horario]
-)
+cur.execute("CALL sp_gestion_horario('D', %s, NULL, NULL, 'cur1')", [id_cuidador_horario])
 p_id, p_ok, p_msg = cur.fetchone()
 conn.commit()
 ```
@@ -998,16 +1056,12 @@ total = row[0] if row else 0
 
 ---
 
-
 ## 18. SP de Reportes (sp_rep_*)
 
 > **Regla absoluta:** Flask **NUNCA hace SELECT directo** a Views ni tablas.
-> Para leer datos usa `CALL sp_rep_*('cursor', ...)` + `FETCH ALL FROM cursor`.
-> Las Views existen como capa interna — Flask no las llama directamente.
+> Siempre `CALL sp_rep_*('cursor', ...)` + `FETCH ALL FROM cursor`.
 
-**Posición de `io_cursor`:** en los `sp_rep_*` va como **primer parámetro**
-porque los demás son opcionales con `DEFAULT` y PostgreSQL exige que
-después de un parámetro con `DEFAULT` todos los siguientes también lo tengan.
+**`io_cursor` va como primer parámetro** en todos los `sp_rep_*`.
 
 ```python
 # Patrón Python para TODOS los sp_rep_*
@@ -1021,8 +1075,6 @@ conn.commit()
 ---
 
 ### `sp_rep_dashboard_cuidador`
-Agenda diaria + contador de alertas pendientes por paciente.
-
 **Firma:** `(INOUT io_cursor, IN p_cuidador INTEGER, IN p_fecha DATE DEFAULT CURRENT_DATE)`
 **Columnas:** `id_cuidador, id_paciente, paciente, medicamento, fecha_hora_programada, tolerancia_min, estado_agenda, dosis_prescrita, unidad, alertas_pend`
 
@@ -1037,24 +1089,12 @@ conn.commit()
 ---
 
 ### `sp_rep_agenda_dia_cuidador`
-Agenda del día con UID NFC para escanear.
-
 **Firma:** `(INOUT io_cursor, IN p_cuidador INTEGER, IN p_fecha DATE DEFAULT CURRENT_DATE)`
 **Columnas:** `id_cuidador, id_agenda, fecha_hora_programada, estado_agenda, tolerancia_min, id_paciente, paciente, nombre_generico, dosis_prescrita, unidad, uid_nfc`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_agenda_dia_cuidador('cur1', %s)", [id_cuidador])
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_alertas_cuidador`
-Alertas de los pacientes de un cuidador.
-
 **Firma:** `(INOUT io_cursor, IN p_cuidador INTEGER, IN p_sol_pendientes BOOLEAN DEFAULT TRUE)`
 **Columnas:** `id_cuidador, id_alerta, prioridad, tipo, estado, timestamp_gen, paciente, medicamento`
 
@@ -1062,338 +1102,211 @@ Alertas de los pacientes de un cuidador.
 cur.execute("BEGIN")
 cur.execute("CALL sp_rep_alertas_cuidador('cur1', %s)", [id_cuidador])       # solo pendientes
 cur.execute("CALL sp_rep_alertas_cuidador('cur1', %s, FALSE)", [id_cuidador]) # todas
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
 ```
 
 ---
 
 ### `sp_rep_alertas_medico`
-Alertas de los pacientes de un médico.
-
 **Firma:** `(INOUT io_cursor, IN p_medico INTEGER, IN p_sol_pendientes BOOLEAN DEFAULT TRUE)`
 **Columnas:** `id_medico, id_alerta, prioridad, tipo, estado, timestamp_gen, paciente, medicamento, id_evento`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_alertas_medico('cur1', %s)", [id_medico])
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_badge_alertas`
-Contador de alertas pendientes para el badge del menú.
-
 **Firma:** `(INOUT io_cursor, IN p_usuario INTEGER, IN p_rol VARCHAR(10))`
 **Columnas:** `total_pendientes`
 
 ```python
 cur.execute("BEGIN")
-cur.execute("CALL sp_rep_badge_alertas('cur1', %s, %s)",
-            [session['user_id'], session['rol']])
+cur.execute("CALL sp_rep_badge_alertas('cur1', %s, %s)", [session['user_id'], session['rol']])
 cur.execute("FETCH ALL FROM cur1")
-row   = cur.fetchone()
-total = row[0] if row else 0
+total = cur.fetchone()[0] if cur.fetchone() else 0
 conn.commit()
 ```
 
 ---
 
 ### `sp_rep_pacientes_medico`
-Pacientes activos con recetas de un médico.
-
 **Firma:** `(INOUT io_cursor, IN p_medico INTEGER)`
 **Columnas:** `id_medico, id_paciente, nombre, apellido_p, apellido_m, fecha_nacimiento, curp, activo, id_receta, estado_receta, fecha_inicio, fecha_fin`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_pacientes_medico('cur1', %s)", [id_medico])
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_perfil_paciente`
-Perfil completo: datos, diagnósticos, cuidador principal, medicamentos activos.
-
 **Firma:** `(INOUT io_cursor, IN p_paciente INTEGER)`
 **Columnas:** `id_paciente, nombre, apellido_p, apellido_m, fecha_nacimiento, curp, activo, diagnosticos, cuidador_princ, medicamentos`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_perfil_paciente('cur1', %s)", [id_paciente])
-cur.execute("FETCH ALL FROM cur1")
-row = cur.fetchone()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_recetas_paciente`
-Recetas y medicamentos de un paciente.
-
 **Firma:** `(INOUT io_cursor, IN p_paciente INTEGER, IN p_estado_receta VARCHAR(20) DEFAULT NULL)`
 **Columnas:** `id_paciente, id_receta, estado_receta, fecha_emision, fecha_inicio, fecha_fin, medico, id_receta_medicamento, nombre_generico, dosis_prescrita, unidad, frecuencia_horas, tolerancia_min, hora_primera_toma`
 
 ```python
 cur.execute("BEGIN")
-cur.execute("CALL sp_rep_recetas_paciente('cur1', %s, 'vigente')", [id_paciente]) # vigentes
-cur.execute("CALL sp_rep_recetas_paciente('cur1', %s)", [id_paciente])            # todas
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
+cur.execute("CALL sp_rep_recetas_paciente('cur1', %s, 'vigente')", [id_paciente])
+# o sin filtro: cur.execute("CALL sp_rep_recetas_paciente('cur1', %s)", [id_paciente])
 ```
 
 ---
 
 ### `sp_rep_historial_tomas`
-Historial de eventos NFC de un paciente.
-
 **Firma:** `(INOUT io_cursor, IN p_paciente INTEGER, IN p_dias INTEGER DEFAULT 14)`
 **Columnas:** `id_paciente, id_evento, timestamp_lectura, uid_nfc, resultado, desfase_min, origen, observaciones, fecha_registro, medicamento, cuidador, distancia_metros, proximidad_valida`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_historial_tomas('cur1', %s, %s)", [id_paciente, 14])
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_adherencia_pacientes_medico`
-Adherencia de los pacientes de un médico por medicamento.
-
 **Firma:** `(INOUT io_cursor, IN p_medico INTEGER, IN p_dias INTEGER DEFAULT 14)`
 **Columnas:** `id_paciente, paciente, medicamento, total, ok, tarde, omitida, pend, pct`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_adherencia_pacientes_medico('cur1', %s, 14)", [id_medico])
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_adherencia_medicos`
-Adherencia global por médico (Admin).
-
 **Firma:** `(INOUT io_cursor, IN p_dias INTEGER DEFAULT 14)`
 **Columnas:** `id_medico, medico, total, ok, tarde, omitida, pct`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_adherencia_medicos('cur1', 14)")
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_adherencia_cuidadores`
-Adherencia global por cuidador (Admin).
-
 **Firma:** `(INOUT io_cursor, IN p_dias INTEGER DEFAULT 14)`
 **Columnas:** `id_cuidador, cuidador, total, ok, tarde, omitida, pct`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_adherencia_cuidadores('cur1', 14)")
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_grafica_tomas`
-Datos diarios para gráfica de barras de adherencia.
-
 **Firma:** `(INOUT io_cursor, IN p_paciente INTEGER, IN p_dias INTEGER DEFAULT 14)`
 **Columnas:** `id_paciente, fecha, total, correctas, fuera_horario, no_tomadas, pendientes`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_grafica_tomas('cur1', %s, 14)", [id_paciente])
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_mapa_medico`
-Datos GPS/Beacon de los pacientes de un médico.
-
 **Firma:** `(INOUT io_cursor, IN p_medico INTEGER)`
 **Columnas:** `id_medico, id_paciente, paciente, id_beacon, bec_lat, bec_lon, radio_metros, gps_lat, gps_lon, gps_ts, cuidador`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_mapa_medico('cur1', %s)", [id_medico])
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_bitacora`
-Bitácora de reglas de negocio (Admin).
-
 **Firma:** `(INOUT io_cursor, IN p_dias INTEGER DEFAULT 7, IN p_limite INTEGER DEFAULT 100)`
 **Columnas:** `id_bitacora, id_evento, regla_aplicada, resultado, detalle, timestamp_eval, uid_nfc, timestamp_lectura, paciente, medicamento`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_bitacora('cur1', 7, 100)")
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_auditoria`
-Historial de auditoría de cambios en tablas maestras (Admin).
-
 **Firma:** `(INOUT io_cursor, IN p_tabla VARCHAR(80) DEFAULT NULL, IN p_limite INTEGER DEFAULT 100)`
 **Columnas:** `id_audit, tabla, id_reg, accion, campo, val_antes, val_despues, usuario_db, id_usr_app, ts`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_auditoria('cur1', 'paciente', 50)")  # tabla específica
-cur.execute("CALL sp_rep_auditoria('cur1')")                   # todas
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_log_acceso`
-Log de intentos de login (Admin).
-
 **Firma:** `(INOUT io_cursor, IN p_usuario INTEGER DEFAULT NULL, IN p_limite INTEGER DEFAULT 100)`
 **Columnas:** `id_log, id_usr, email, rol, ip, exitoso, ts`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_log_acceso('cur1')")
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_carga_medicos`
-Carga de pacientes por médico (Admin).
-
 **Firma:** `(INOUT io_cursor)`
 **Columnas:** `id_medico, medico, cedula_profesional, total_pac, pacientes`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_carga_medicos('cur1')")
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_supervision`
-Supervisión médico-paciente (Admin).
-
 **Firma:** `(INOUT io_cursor)`
 **Columnas:** `id_paciente, paciente, id_medico, medico, id_receta, estado_receta, fecha_inicio, fecha_fin`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_supervision('cur1')")
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_dispositivos_iot`
-GPS y Beacons con su asignación (Admin).
-
 **Firma:** `(INOUT io_cursor)`
 **Columnas:** `tipo` (`'GPS'`|`'BEACON'`), `id_disp, ident, nombre, asignado, activo`
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_dispositivos_iot('cur1')")
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
 
 ---
 
 ### `sp_rep_tendencia_adherencia`
-Tendencia con ventana móvil de 7 días (Médico/Admin).
-
 **Firma:** `(INOUT io_cursor, IN p_paciente INTEGER DEFAULT NULL, IN p_dias INTEGER DEFAULT 30)`
 **Columnas:** `id_paciente, paciente, fecha, total_citas, cumplidas, tardias, omitidas, pct_dia, promedio_movil_7d, tendencia`
 **`tendencia`:** `'INICIO'`, `'MEJORA'`, `'DECLIVE'`, `'ESTABLE'`
 
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_tendencia_adherencia('cur1', %s, 30)", [id_paciente])
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
-
 ---
 
 ### `sp_rep_riesgo_omision`
-Rachas de omisiones consecutivas con nivel de riesgo (Médico/Admin).
-
 **Firma:** `(INOUT io_cursor, IN p_paciente INTEGER DEFAULT NULL, IN p_solo_activas BOOLEAN DEFAULT TRUE, IN p_min_dias INTEGER DEFAULT 2)`
 **Columnas:** `id_paciente, paciente, medicamento, inicio_racha, fin_racha, dias_consecutivos, nivel_riesgo, racha_activa, dias_desde_ultima_omision`
-**`nivel_riesgo`:** `'CRÍTICO'` (≥5 días), `'ALTO'` (≥3 días), `'MODERADO'` (<3 días)
-
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_riesgo_omision('cur1', %s)", [id_paciente])
-cur.execute("FETCH ALL FROM cur1")
-rows = cur.fetchall()
-conn.commit()
-```
+**`nivel_riesgo`:** `'CRÍTICO'` (≥5), `'ALTO'` (≥3), `'MODERADO'` (<3)
 
 ---
 
 ### `sp_rep_ranking_mejora`
-Ranking de mejora de adherencia. Ventana fija: últimos 14 días vs 14 anteriores (Admin).
-
 **Firma:** `(INOUT io_cursor, IN p_rol VARCHAR(10) DEFAULT NULL)`
 **Columnas:** `rol, id_persona, nombre, pct_anterior, pct_reciente, delta_pct, rank_mejora, dense_rank_mejora, cuartil_mejora, clasificacion`
 **`clasificacion`:** `'MEJORA SIGNIFICATIVA'`, `'MEJORA LEVE'`, `'SIN CAMBIO'`, `'DECLIVE LEVE'`, `'DECLIVE SIGNIFICATIVO'`
 
+---
+
+### `sp_rep_vinculo_paciente_cuidador`
+**Firma:** `(INOUT io_cursor, IN p_paciente INTEGER, IN p_solo_activo BOOLEAN DEFAULT TRUE)`
+**Columnas:** `id_paciente_cuidador, id_cuidador, es_principal, activo, cuidador`
+
 ```python
 cur.execute("BEGIN")
-cur.execute("CALL sp_rep_ranking_mejora('cur1')")           # ambos roles
-cur.execute("CALL sp_rep_ranking_mejora('cur1', 'medico')") # solo médicos
+cur.execute("CALL sp_rep_vinculo_paciente_cuidador('cur1', %s)", [id_paciente])
+cur.execute("FETCH ALL FROM cur1")
+vinculos = cur.fetchall()
+conn.commit()
+```
+
+---
+
+### `sp_rep_recetas_medico`
+**Firma:** `(INOUT io_cursor, IN p_medico INTEGER, IN p_estado VARCHAR(20) DEFAULT NULL)`
+**Columnas:** `id_receta, pac_nombre, estado_receta, fecha_emision, fecha_inicio, fecha_fin, id_receta_medicamento, nombre_generico, dosis_prescrita, unidad, frecuencia_horas, tolerancia_min, hora_primera_toma`
+
+```python
+cur.execute("BEGIN")
+cur.execute("CALL sp_rep_recetas_medico('cur1', %s)", [id_medico])            # todas
+cur.execute("CALL sp_rep_recetas_medico('cur1', %s, 'vigente')", [id_medico]) # solo vigentes
 cur.execute("FETCH ALL FROM cur1")
 rows = cur.fetchall()
 conn.commit()
 ```
+
+---
+
+### `sp_rep_detalle_paciente_admin`
+**Firma:** `(INOUT io_cursor, IN p_paciente INTEGER)`
+**Columnas:** `id_paciente, paciente, id_medico, medico, id_cuidador, cuidador, es_principal, id_receta, estado_receta, fecha_inicio, fecha_fin, medicamento, dosis_prescrita, unidad, frecuencia_horas`
+
+---
+
+### `sp_rep_pacientes_cuidador_admin`
+**Firma:** `(INOUT io_cursor, IN p_cuidador INTEGER)`
+**Columnas:** `id_cuidador, cuidador, id_paciente, paciente, es_principal, medico_responsable, id_receta, estado_receta, medicamento, dosis_prescrita, unidad, frecuencia_horas`
+
+---
+
+### `sp_rep_pacientes_medico_admin`
+**Firma:** `(INOUT io_cursor, IN p_medico INTEGER)`
+**Columnas:** `id_medico, medico, id_paciente, paciente, cuidador_principal, id_receta, estado_receta, fecha_inicio, fecha_fin, medicamento, dosis_prescrita, unidad, frecuencia_horas`
+
+---
+
+### `sp_rep_lista_cuidadores`
+**Firma:** `(INOUT io_cursor)`
+**Columnas:** `id_cuidador, cuidador`
+
+```python
+cur.execute("BEGIN")
+cur.execute("CALL sp_rep_lista_cuidadores('cur1')")
+cur.execute("FETCH ALL FROM cur1")
+rows = cur.fetchall()
+conn.commit()
+```
+
+---
+
+### `sp_rep_lista_usuarios`
+**Firma:** `(INOUT io_cursor)`
+**Columnas:** `id_usuario, email, rol_usuario, activo, ultimo_acceso, nombre_persona, id_rol`
 
 ---
 
@@ -1404,61 +1317,73 @@ conn.commit()
 | `trg_antes_evento` | `evento_nfc` | BEFORE INSERT | Calcula desfase, detecta duplicados, clasifica resultado, actualiza agenda |
 | `trg_despues_evento` | `evento_nfc` | AFTER INSERT | Inserta en `alerta` y `bitacora_regla_negocio` |
 | `trg_generar_agenda` | `receta_medicamento` | AFTER INSERT | Genera todas las entradas de `agenda_toma` |
-| `trg_audit_*` | varias | AFTER INSERT/UPDATE | Registra cambios en `audit_cambios` |
+| `trg_audit_paciente` | `paciente` | AFTER INSERT/UPDATE | Registra cambios en `audit_cambios` |
+| `trg_audit_medico` | `medico` | AFTER INSERT/UPDATE | Registra cambios en `audit_cambios` |
+| `trg_audit_cuidador` | `cuidador` | AFTER INSERT/UPDATE | Registra cambios en `audit_cambios` |
+| `trg_audit_usuario` | `usuario` | AFTER INSERT/UPDATE | Registra cambios en `audit_cambios` |
 
 ---
 
-## Referencia rápida — 43 SPs totales
+## Referencia rápida — SPs totales
 
-### CRUD y Operativos (20 SPs)
+### CRUD y Operativos
 
-| SP | Tipo | Acciones | Rol |
-|----|------|----------|-----|
-| `sp_gestion_paciente` | CRUD | I/U/D | Admin/Médico |
-| `sp_gestion_medico` | CRUD | I/U/D | Admin |
-| `sp_gestion_cuidador` | CRUD | I/U/D | Admin |
-| `sp_gestion_medicamento` | CRUD | I/U/D | Admin |
-| `sp_gestion_diagnostico` | CRUD | I/U | Admin |
-| `sp_gestion_especialidad` | CRUD | I/U | Admin |
-| `sp_gestion_beacon` | CRUD IoT | I/U/D | Admin |
-| `sp_gestion_gps` | CRUD IoT | I/U/D | Admin |
-| `sp_gestion_horario` | CRUD Horario | I/D/L | Admin/Médico |
-| `sp_crear_receta` | Receta | — | Médico |
-| `sp_agregar_receta_med` | Receta | — | Médico |
-| `sp_cancelar_receta` | Receta | — | Médico |
-| `sp_registrar_toma_nfc` | Operativo | — | Cuidador |
-| `sp_marcar_alerta_atendida` | Alerta | — | Médico/Cuidador |
-| `sp_detectar_omisiones` | Batch cron | — | Sistema |
-| `sp_asignar_diagnostico` | Asignación | — | Médico |
-| `sp_asignar_cuidador` | Asignación | — | Admin |
-| `sp_asignar_especialidad` | Asignación | — | Admin |
-| `sp_crear_usuario_admin` | Usuario | — | Admin |
-| ~~`sp_login`~~ | ~~Auth~~ | — | ~~No usar~~ |
+| SP | Acciones | Rol |
+|----|----------|-----|
+| `sp_gestion_paciente` | I/U/D/L | Admin/Médico |
+| `sp_gestion_medico` | I/U/D/L | Admin |
+| `sp_gestion_cuidador` | I/U/D/L/R | Admin |
+| `sp_gestion_medicamento` | I/U/D/L | Admin |
+| `sp_gestion_diagnostico` | I/U | Admin |
+| `sp_gestion_especialidad` | I/U | Admin |
+| `sp_gestion_beacon` | I/U/D | Admin |
+| `sp_gestion_gps` | I/U/D | Admin |
+| `sp_gestion_horario` | I/D/L | Admin/Médico |
+| `sp_gestion_usuario` | U/D/A | Admin |
+| `sp_crear_receta` | — | Médico |
+| `sp_agregar_receta_med` | — | Médico |
+| `sp_cancelar_receta` | — | Médico |
+| `sp_registrar_toma_nfc` | — | Cuidador |
+| `sp_marcar_alerta_atendida` | — | Médico/Cuidador |
+| `sp_detectar_omisiones` | — | Sistema (cron) |
+| `sp_asignar_diagnostico` | — | Médico |
+| `sp_asignar_cuidador` | — | Admin |
+| `sp_desasignar_cuidador` | — | Admin |
+| `sp_asignar_especialidad` | — | Admin |
+| `sp_crear_usuario_admin` | — | Admin |
+| ~~`sp_login`~~ | — | ~~No usar~~ |
 
-### Reportes sp_rep_* (23 SPs)
+### Reportes sp_rep_* (31 SPs)
 
-| SP | Descripción | Rol |
-|----|-------------|-----|
-| `sp_rep_dashboard_cuidador` | Agenda diaria + alertas_pend | Cuidador |
-| `sp_rep_agenda_dia_cuidador` | Agenda con UID NFC | Cuidador |
-| `sp_rep_alertas_cuidador` | Alertas del cuidador | Cuidador |
-| `sp_rep_alertas_medico` | Alertas del médico | Médico |
-| `sp_rep_badge_alertas` | Contador badge menú | Médico/Cuidador |
-| `sp_rep_pacientes_medico` | Lista pacientes del médico | Médico |
-| `sp_rep_perfil_paciente` | Perfil completo | Médico |
-| `sp_rep_recetas_paciente` | Recetas y medicamentos | Médico/Cuidador |
-| `sp_rep_historial_tomas` | Historial NFC | Médico |
-| `sp_rep_adherencia_pacientes_medico` | Adherencia por paciente | Médico |
-| `sp_rep_adherencia_medicos` | Adherencia global médicos | Admin |
-| `sp_rep_adherencia_cuidadores` | Adherencia global cuidadores | Admin |
-| `sp_rep_grafica_tomas` | Datos gráfica de barras | Médico |
-| `sp_rep_mapa_medico` | GPS/Beacon mapa | Médico |
-| `sp_rep_bitacora` | Bitácora reglas negocio | Admin |
-| `sp_rep_auditoria` | Auditoría de cambios | Admin |
-| `sp_rep_log_acceso` | Log de logins | Admin |
-| `sp_rep_carga_medicos` | Carga por médico | Admin |
-| `sp_rep_supervision` | Supervisión médico-paciente | Admin |
-| `sp_rep_dispositivos_iot` | GPS y Beacons | Admin |
-| `sp_rep_tendencia_adherencia` | Tendencia 7d móvil | Médico/Admin |
-| `sp_rep_riesgo_omision` | Rachas de omisión | Médico/Admin |
-| `sp_rep_ranking_mejora` | Ranking mejora adherencia | Admin |
+| SP | Rol |
+|----|-----|
+| `sp_rep_dashboard_cuidador` | Cuidador |
+| `sp_rep_agenda_dia_cuidador` | Cuidador |
+| `sp_rep_alertas_cuidador` | Cuidador |
+| `sp_rep_alertas_medico` | Médico |
+| `sp_rep_badge_alertas` | Médico/Cuidador |
+| `sp_rep_pacientes_medico` | Médico |
+| `sp_rep_perfil_paciente` | Médico |
+| `sp_rep_recetas_paciente` | Médico/Cuidador |
+| `sp_rep_historial_tomas` | Médico |
+| `sp_rep_adherencia_pacientes_medico` | Médico |
+| `sp_rep_adherencia_medicos` | Admin |
+| `sp_rep_adherencia_cuidadores` | Admin |
+| `sp_rep_grafica_tomas` | Médico |
+| `sp_rep_mapa_medico` | Médico |
+| `sp_rep_bitacora` | Admin |
+| `sp_rep_auditoria` | Admin |
+| `sp_rep_log_acceso` | Admin |
+| `sp_rep_carga_medicos` | Admin |
+| `sp_rep_supervision` | Admin |
+| `sp_rep_dispositivos_iot` | Admin |
+| `sp_rep_tendencia_adherencia` | Médico/Admin |
+| `sp_rep_riesgo_omision` | Médico/Admin |
+| `sp_rep_ranking_mejora` | Admin |
+| `sp_rep_vinculo_paciente_cuidador` | Admin/Médico |
+| `sp_rep_recetas_medico` | Médico |
+| `sp_rep_detalle_paciente_admin` | Admin |
+| `sp_rep_pacientes_cuidador_admin` | Admin |
+| `sp_rep_pacientes_medico_admin` | Admin |
+| `sp_rep_lista_cuidadores` | Admin |
+| `sp_rep_lista_usuarios` | Admin |

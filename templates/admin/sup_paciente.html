@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Detalle Paciente{% endblock %}
+{% block page_title %}Detalle Paciente{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1>{{ paciente_nombre }}</h1>
+    <p>Detalle clínico completo</p>
+  </div>
+  <a href="{{ url_for('admin_supervision_detalle') }}" class="btn btn-outline">
+    <i data-lucide="arrow-left" style="width:14px;height:14px;"></i> Volver
+  </a>
+</div>
+
+<!-- Médico y Cuidadores lado a lado -->
+<div style="display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+  <div class="card" style="flex:1;min-width:220px;">
+    <div class="card-header" style="padding:14px 18px;border-bottom:1px solid #E5E7EB;">
+      <h3 style="font-size:14px;font-weight:600;margin:0;display:flex;align-items:center;gap:6px;">
+        <i data-lucide="stethoscope" style="width:15px;height:15px;color:#6366F1;"></i> Médico responsable
+      </h3>
+    </div>
+    <div style="padding:14px 18px;font-size:14px;">
+      {{ medico or '—' }}
+    </div>
+  </div>
+
+  <div class="card" style="flex:2;min-width:260px;">
+    <div class="card-header" style="padding:14px 18px;border-bottom:1px solid #E5E7EB;">
+      <h3 style="font-size:14px;font-weight:600;margin:0;display:flex;align-items:center;gap:6px;">
+        <i data-lucide="users" style="width:15px;height:15px;color:#6366F1;"></i> Cuidadores
+      </h3>
+    </div>
+    <div style="padding:14px 18px;">
+      {% if cuidadores %}
+        {% for c in cuidadores %}
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+          <span style="font-size:14px;">{{ c.nombre }}</span>
+          {% if c.es_principal %}
+            <span class="badge badge-green" style="font-size:11px;">Principal</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <span style="color:#9CA3AF;font-size:13px;">Sin cuidadores asignados</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Tabla de recetas -->
+<div class="card">
+  <div class="card-header" style="padding:14px 18px;border-bottom:1px solid #E5E7EB;">
+    <h3 style="font-size:14px;font-weight:600;margin:0;">Recetas</h3>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Receta</th><th>Estado</th><th>Inicio</th><th>Fin</th><th>Medicamentos</th>
+      </tr></thead>
+      <tbody>
+        {% for id_rec, rec in recetas.items() %}
+        <tr>
+          <td style="font-family:monospace;font-size:12px;color:#9CA3AF;">#{{ id_rec }}</td>
+          <td>
+            {% if rec.estado == 'vigente' %}
+              <span class="badge badge-green">Vigente</span>
+            {% elif rec.estado == 'vencida' %}
+              <span class="badge badge-yellow">Vencida</span>
+            {% else %}
+              <span class="badge badge-red">{{ rec.estado | capitalize }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ rec.fecha_inicio or '—' }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ rec.fecha_fin or '—' }}</td>
+          <td style="font-size:13px;">
+            {% for m in rec.meds %}
+              <div>{{ m }}</div>
+            {% else %}
+              <span style="color:#9CA3AF;">Sin medicamentos</span>
+            {% endfor %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:32px;">Sin recetas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}
