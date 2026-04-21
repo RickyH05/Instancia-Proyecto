@@ -329,7 +329,8 @@ def admin_medicos():
                 flash("Acción no válida.", "danger")
                 return redirect(url_for("admin_medicos"))
 
-            _, p_ok, p_msg = cur.fetchone()
+            _row = cur.fetchone()
+            p_ok, p_msg = _row[1], _row[2]
             conn.commit()
             cur.close(); conn.close()
             flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -398,7 +399,8 @@ def admin_cuidadores():
                 flash("Acción no válida.", "danger")
                 return redirect(url_for("admin_cuidadores"))
 
-            _, p_ok, p_msg = cur.fetchone()
+            _row = cur.fetchone()
+            p_ok, p_msg = _row[1], _row[2]
             conn.commit()
             cur.close(); conn.close()
             flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -466,7 +468,7 @@ def admin_pacientes():
                 flash("Acción no válida.", "danger")
                 return redirect(url_for("admin_pacientes"))
 
-            _, p_ok, p_msg = cur.fetchone()
+            _, p_ok, p_msg = cur.fetchone()[:3]
             conn.commit()
             cur.close(); conn.close()
             flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -475,32 +477,30 @@ def admin_pacientes():
 
         return redirect(url_for("admin_pacientes"))
 
-    # GET — SELECT directo (no hay view para listar pacientes — excepción aceptada)
-    pacientes = []
+    # GET
+    pacientes    = []
     diagnosticos = []
     cuidadores   = []
     try:
         conn, cur = _admin_db()
-        cur.execute("""
-            SELECT id_paciente, nombre, apellido_p,
-                   COALESCE(apellido_m,'') AS apellido_m,
-                   COALESCE(curp,'') AS curp,
-                   fecha_nacimiento, activo,
-                   COALESCE(foto_perfil,'') AS foto_perfil
-            FROM paciente
-            ORDER BY apellido_p, nombre
-        """)
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_paciente('L', NULL, NULL, NULL, 'cur_pac_l')")
+        cur.execute("FETCH ALL FROM cur_pac_l")
         pacientes = cur.fetchall()
+        conn.commit()
 
-        cur.execute("SELECT id_diagnostico, descripcion FROM diagnostico ORDER BY descripcion")
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_diagnostico('L', NULL, NULL, NULL, 'cur_diag_l')")
+        cur.execute("FETCH ALL FROM cur_diag_l")
         diagnosticos = cur.fetchall()
+        conn.commit()
 
-        cur.execute("""
-            SELECT id_cuidador,
-                   nombre || ' ' || apellido_p || ' ' || COALESCE(apellido_m,'') AS nombre_completo
-            FROM cuidador ORDER BY apellido_p, nombre
-        """)
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_cuidador('L', NULL, NULL, NULL, 'cur_cuid_l')")
+        cur.execute("FETCH ALL FROM cur_cuid_l")
         cuidadores = cur.fetchall()
+        conn.commit()
 
         cur.close(); conn.close()
     except Exception as e:
@@ -525,7 +525,8 @@ def admin_paciente_asignar_diagnostico(id_pac):
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_asignar_diagnostico(%s, %s, NULL, NULL, 'cur_asig_diag')", [id_pac, id_diag])
-        p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_ok, p_msg = _row[1], _row[2]
         conn.commit()
         cur.close(); conn.close()
         flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -548,7 +549,8 @@ def admin_paciente_asignar_cuidador(id_pac):
         cur.execute("BEGIN")
         cur.execute("CALL sp_asignar_cuidador(%s, %s, NULL, NULL, 'cur_asig_cuid', %s)",
                     [id_pac, id_cuid, principal])
-        p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_ok, p_msg = _row[1], _row[2]
         conn.commit()
         cur.close(); conn.close()
         flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -594,7 +596,8 @@ def admin_medicamentos():
                 flash("Acción no válida.", "danger")
                 return redirect(url_for("admin_medicamentos"))
 
-            _, p_ok, p_msg = cur.fetchone()
+            _row = cur.fetchone()
+            p_ok, p_msg = _row[1], _row[2]
             conn.commit()
             cur.close(); conn.close()
             flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -654,7 +657,8 @@ def admin_diagnosticos():
                 flash("Acción no válida (solo I/U).", "danger")
                 return redirect(url_for("admin_diagnosticos"))
 
-            _, p_ok, p_msg = cur.fetchone()
+            _row = cur.fetchone()
+            p_ok, p_msg = _row[1], _row[2]
             conn.commit()
             cur.close(); conn.close()
             flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -705,7 +709,8 @@ def admin_especialidades():
                 flash("Acción no válida (solo I/U).", "danger")
                 return redirect(url_for("admin_especialidades"))
 
-            _, p_ok, p_msg = cur.fetchone()
+            _row = cur.fetchone()
+            p_ok, p_msg = _row[1], _row[2]
             conn.commit()
             cur.close(); conn.close()
             flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -765,7 +770,8 @@ def admin_beacon():
                 flash("Acción no válida.", "danger")
                 return redirect(url_for("admin_beacon"))
 
-            _, p_ok, p_msg = cur.fetchone()
+            _row = cur.fetchone()
+            p_ok, p_msg = _row[1], _row[2]
             conn.commit()
             cur.close(); conn.close()
             flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -834,7 +840,8 @@ def admin_gps():
                 flash("Acción no válida.", "danger")
                 return redirect(url_for("admin_gps"))
 
-            _, p_ok, p_msg = cur.fetchone()
+            _row = cur.fetchone()
+            p_ok, p_msg = _row[1], _row[2]
             conn.commit()
             cur.close(); conn.close()
             flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -971,7 +978,8 @@ def admin_asignar_cuidador():
             "CALL sp_asignar_cuidador(%s, %s, NULL, NULL, 'cur_asig_c2', %s)",
             [id_pac, id_c, princ],
         )
-        p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_ok, p_msg = _row[1], _row[2]
         conn.commit()
         cur.close(); conn.close()
         flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -1000,7 +1008,8 @@ def admin_asignar_diagnostico():
             "CALL sp_asignar_diagnostico(%s, %s, NULL, NULL, 'cur_asig_d2')",
             [id_pac, id_diag],
         )
-        p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_ok, p_msg = _row[1], _row[2]
         conn.commit()
         cur.close(); conn.close()
         flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -1029,7 +1038,8 @@ def admin_asignar_especialidad():
             "CALL sp_asignar_especialidad(%s, %s, NULL, NULL, 'cur_asig_esp')",
             [id_med, id_esp],
         )
-        p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_ok, p_msg = _row[1], _row[2]
         conn.commit()
         cur.close(); conn.close()
         flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -1380,10 +1390,16 @@ def doctor_pacientes():
         for r in rows:
             _, pid, nom, ap, am, fnac, curp, activo, id_rx, est_rx, f_ini, f_fin = r
             if pid not in pac_map:
+                from datetime import date as _date
+                edad = None
+                if fnac:
+                    hoy = _date.today()
+                    edad = hoy.year - fnac.year - ((hoy.month, hoy.day) < (fnac.month, fnac.day))
                 pac_map[pid] = {
                     "id":      pid,
                     "nombre":  f"{nom} {ap} {am or ''}".strip(),
                     "curp":    curp or "",
+                    "edad":    edad,
                     "activo":  activo,
                     "recetas": [],
                     "foto":    "",
@@ -1433,7 +1449,7 @@ def doctor_paciente_nuevo():
             "CALL sp_gestion_paciente('I', NULL, NULL, NULL, 'cur_pac_nuevo', %s, %s, %s, %s, %s, %s)",
             [nom, ap, am, nac, curp, foto],
         )
-        _, p_ok, p_msg = cur.fetchone()
+        p_id, p_ok, p_msg = cur.fetchone()[:3]
         conn.commit()
         cur.close(); conn.close()
         flash(p_msg, "success" if p_ok == 1 else "danger")
@@ -1671,7 +1687,8 @@ def doctor_receta_crear(id):
             "CALL sp_crear_receta(NULL, NULL, NULL, 'cur_rx_crear', %s, %s, %s, %s, %s)",
             [id, id_medico, f_emi, f_ini, f_fin],
         )
-        p_id_rx, p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_id_rx, p_ok, p_msg = _row[0], _row[1], _row[2]
         conn.commit()
 
         if p_ok != 1:
@@ -1730,7 +1747,8 @@ def doctor_receta_cancelar(id_receta):
         # ── sp_cancelar_receta ───────────────────────────────────────────────
         cur.execute("BEGIN")
         cur.execute("CALL sp_cancelar_receta(%s, NULL, NULL, 'cur_cancelar')", [id_receta])
-        p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_ok, p_msg = _row[1], _row[2]
         conn.commit()
         cur.close()
         conn.close()
@@ -1816,7 +1834,8 @@ def doctor_alerta_atender(id_alerta):
             "CALL sp_marcar_alerta_atendida(%s, NULL, NULL, 'cur_atender_med', %s)",
             [id_alerta, obs],
         )
-        p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_ok, p_msg = _row[1], _row[2]
         conn.commit()
         cur.close()
         conn.close()
@@ -2140,6 +2159,29 @@ def doctor_horario_agregar(id):
     return redirect(url_for("doctor_asignar_cuidador", id=id))
 
 
+@app.route("/doctor/pacientes/<int:id_pac>/desasignar_cuidador", methods=["POST"])
+@login_requerido
+@rol_requerido("medico")
+def doctor_desasignar_cuidador(id_pac):
+    id_pac_cuid = request.form.get("id_paciente_cuidador", type=int)
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_desasignar_cuidador(%s, NULL, NULL, 'cur_desasig')", [id_pac_cuid])
+        p_ok, p_msg = cur.fetchone()[:2]
+        conn.commit()
+        cur.close()
+        conn.close()
+        if p_ok == 1:
+            flash("Cuidador desasignado correctamente.", "success")
+        else:
+            flash(f"No se pudo desasignar: {p_msg}", "danger")
+    except Exception as e:
+        flash(f"Error: {e}", "danger")
+    return redirect(url_for('doctor_paciente_perfil', id=id_pac))
+
+
 @app.route("/doctor/pacientes/<int:id>/horario/eliminar", methods=["POST"])
 @login_requerido
 @rol_requerido("medico")
@@ -2206,7 +2248,8 @@ def doctor_receta_desde_lista():
             "CALL sp_crear_receta(NULL, NULL, NULL, 'cur_rx_lista', %s, %s, %s, %s, %s)",
             [id_pac, id_medico, f_emi, f_ini, f_fin],
         )
-        p_id_rx, p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_id_rx, p_ok, p_msg = _row[0], _row[1], _row[2]
         conn.commit()
         if p_ok != 1:
             flash(p_msg, "danger")
@@ -2746,7 +2789,8 @@ def cuidador_alerta_atender(id_alerta):
             "CALL sp_marcar_alerta_atendida(%s, NULL, NULL, 'cur_atender_cuid', %s)",
             [id_alerta, obs],
         )
-        p_ok, p_msg = cur.fetchone()
+        _row = cur.fetchone()
+        p_ok, p_msg = _row[1], _row[2]
         conn.commit()
         cur.close()
         conn.close()
@@ -2924,6 +2968,295 @@ def detectar_omisiones():
     finally:
         if conn:
             conn.close()
+
+
+# ═══════════════════════════════════════════════════════
+# GRÁFICAS — MÉDICO
+# ═══════════════════════════════════════════════════════
+
+@app.route("/doctor/pacientes/<int:id_pac>/grafica-tomas")
+@login_requerido
+@rol_requerido("medico")
+def doctor_grafica_tomas(id_pac):
+    dias = request.args.get("dias", 14, type=int)
+    if not dias or dias <= 0:
+        dias = 14
+    nombre_paciente = ""
+    datos = []
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_perfil_paciente('cur_perf_gt', %s)", [id_pac])
+        cur.execute("FETCH ALL FROM cur_perf_gt")
+        filas = cur.fetchall()
+        conn.commit()
+        if filas:
+            r = filas[0]
+            nombre_paciente = f"{r[1]} {r[2]}" if r[1] else ""
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_grafica_tomas('cur_gt', %s, %s)", [id_pac, dias])
+        cur.execute("FETCH ALL FROM cur_gt")
+        rows = cur.fetchall()
+        conn.commit()
+        for r in rows:
+            datos.append({
+                "fecha":         str(r[1]),
+                "correctas":     int(r[3] or 0),
+                "fuera_horario": int(r[4] or 0),
+                "no_tomadas":    int(r[5] or 0),
+                "pendientes":    int(r[6] or 0),
+            })
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar gráfica: {e}", "danger")
+    return render_template("doctor/grafica_tomas.html",
+                           id_pac=id_pac,
+                           nombre_paciente=nombre_paciente,
+                           datos=datos,
+                           dias=dias)
+
+
+@app.route("/doctor/pacientes/<int:id_pac>/tendencia")
+@login_requerido
+@rol_requerido("medico")
+def doctor_tendencia(id_pac):
+    dias = request.args.get("dias", 30, type=int)
+    if not dias or dias <= 0:
+        dias = 30
+    nombre_paciente = ""
+    datos = []
+    tendencia_global = ""
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_perfil_paciente('cur_perf_td', %s)", [id_pac])
+        cur.execute("FETCH ALL FROM cur_perf_td")
+        filas = cur.fetchall()
+        conn.commit()
+        if filas:
+            r = filas[0]
+            nombre_paciente = f"{r[1]} {r[2]}" if r[1] else ""
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_tendencia_adherencia('cur_tend', %s, %s)", [id_pac, dias])
+        cur.execute("FETCH ALL FROM cur_tend")
+        rows = cur.fetchall()
+        conn.commit()
+        for r in rows:
+            datos.append({
+                "fecha":     str(r[2]),
+                "pct_dia":   float(r[7]) if r[7] is not None else None,
+                "mov7d":     float(r[8]) if r[8] is not None else None,
+                "tendencia": str(r[9] or ""),
+            })
+        if datos:
+            tendencia_global = datos[-1]["tendencia"]
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar tendencia: {e}", "danger")
+    return render_template("doctor/tendencia.html",
+                           id_pac=id_pac,
+                           nombre_paciente=nombre_paciente,
+                           datos=datos,
+                           dias=dias,
+                           tendencia_global=tendencia_global)
+
+
+@app.route("/doctor/riesgo-omision")
+@login_requerido
+@rol_requerido("medico")
+def doctor_riesgo_omision():
+    id_medico  = session["id_rol"]
+    solo_activas = request.args.get("activas", "1") == "1"
+    min_dias     = request.args.get("min_dias", 2, type=int)
+    filas = []
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_pacientes_medico('cur_pacs_ro', %s)", [id_medico])
+        cur.execute("FETCH ALL FROM cur_pacs_ro")
+        mis_pacs = {int(r[1]) for r in cur.fetchall()}
+        conn.commit()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_riesgo_omision('cur_riesgo', NULL, %s, %s)",
+                    [solo_activas, min_dias])
+        cur.execute("FETCH ALL FROM cur_riesgo")
+        rows = cur.fetchall()
+        conn.commit()
+
+        for r in rows:
+            if r[0] in mis_pacs:
+                filas.append({
+                    "id_paciente":              r[0],
+                    "paciente":                 r[1],
+                    "medicamento":              r[2],
+                    "inicio_racha":             str(r[3]) if r[3] else "",
+                    "fin_racha":                str(r[4]) if r[4] else "",
+                    "dias_consecutivos":        int(r[5] or 0),
+                    "nivel_riesgo":             str(r[6] or ""),
+                    "racha_activa":             bool(r[7]),
+                    "dias_desde_ultima_omision": int(r[8] or 0),
+                })
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar riesgo de omisión: {e}", "danger")
+    return render_template("doctor/riesgo_omision.html",
+                           filas=filas,
+                           solo_activas=solo_activas,
+                           min_dias=min_dias)
+
+
+# ═══════════════════════════════════════════════════════
+# GRÁFICAS — ADMIN
+# ═══════════════════════════════════════════════════════
+
+@app.route("/admin/reporte-ranking-mejora")
+@login_requerido
+@rol_requerido("admin")
+def admin_reporte_ranking_mejora():
+    rol_filtro = request.args.get("rol", "")
+    filas = []
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        p_rol = rol_filtro if rol_filtro else None
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_ranking_mejora('cur_rank', %s)", [p_rol])
+        cur.execute("FETCH ALL FROM cur_rank")
+        rows = cur.fetchall()
+        conn.commit()
+        for r in rows:
+            filas.append({
+                "rol":               r[0],
+                "id_persona":        r[1],
+                "nombre":            r[2],
+                "pct_anterior":      float(r[3]) if r[3] is not None else 0,
+                "pct_reciente":      float(r[4]) if r[4] is not None else 0,
+                "delta_pct":         float(r[5]) if r[5] is not None else 0,
+                "rank_mejora":       int(r[6] or 0),
+                "dense_rank_mejora": int(r[7] or 0),
+                "cuartil_mejora":    int(r[8] or 0),
+                "clasificacion":     str(r[9] or ""),
+            })
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar ranking: {e}", "danger")
+    return render_template("admin/reporte_ranking_mejora.html",
+                           filas=filas,
+                           rol_filtro=rol_filtro)
+
+
+@app.route("/admin/reporte-tendencia-global")
+@login_requerido
+@rol_requerido("admin")
+def admin_reporte_tendencia_global():
+    from collections import defaultdict
+    dias = request.args.get("dias", 30, type=int)
+    if not dias or dias <= 0:
+        dias = 30
+    filas = []
+    clasificacion = defaultdict(list)
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_tendencia_adherencia('cur_tg', NULL, %s)", [dias])
+        cur.execute("FETCH ALL FROM cur_tg")
+        rows = cur.fetchall()
+        conn.commit()
+        for r in rows:
+            filas.append({
+                "id_paciente": r[0],
+                "paciente":    r[1],
+                "fecha":       str(r[2]),
+                "pct_dia":     float(r[7]) if r[7] is not None else None,
+                "mov7d":       float(r[8]) if r[8] is not None else None,
+                "tendencia":   str(r[9] or ""),
+            })
+
+        ultimas_tendencias = {}
+        for r in rows:
+            id_pac = r[0]
+            fecha  = r[2]
+            if id_pac not in ultimas_tendencias or fecha > ultimas_tendencias[id_pac]["fecha"]:
+                ultimas_tendencias[id_pac] = {
+                    "fecha":     fecha,
+                    "nombre":    r[1],
+                    "tendencia": str(r[9] or ""),
+                }
+        for pac in ultimas_tendencias.values():
+            clasificacion[pac["tendencia"]].append(pac["nombre"])
+
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar tendencia global: {e}", "danger")
+    return render_template("admin/reporte_tendencia_global.html",
+                           filas=filas,
+                           clasificacion=clasificacion,
+                           dias=dias)
+
+
+# ═══════════════════════════════════════════════════════
+# GRÁFICAS — CUIDADOR
+# ═══════════════════════════════════════════════════════
+
+@app.route("/cuidador/grafica-adherencia")
+@login_requerido
+@rol_requerido("cuidador")
+def cuidador_grafica_adherencia():
+    from datetime import date
+    id_cuidador = session["id_rol"]
+    dias = request.args.get("dias", 7, type=int)
+    if not dias or dias <= 0:
+        dias = 7
+    pacientes_datos = {}
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_dashboard_cuidador('cur_dash_ga', %s, %s)",
+                    [id_cuidador, date.today()])
+        cur.execute("FETCH ALL FROM cur_dash_ga")
+        rows_dash = cur.fetchall()
+        conn.commit()
+
+        ids_paciente = list({r[0] for r in rows_dash if r[0]})
+
+        for id_pac in ids_paciente:
+            nombre_pac = next((r[1] for r in rows_dash if r[0] == id_pac), str(id_pac))
+            cur_name = f"cur_gt_cuid_{id_pac}"
+            cur.execute("BEGIN")
+            cur.execute(f"CALL sp_rep_grafica_tomas('{cur_name}', %s, %s)",
+                        [id_pac, dias])
+            cur.execute(f"FETCH ALL FROM {cur_name}")
+            rows_g = cur.fetchall()
+            conn.commit()
+            puntos = []
+            for r in rows_g:
+                puntos.append({
+                    "fecha":         str(r[1]),
+                    "correctas":     int(r[3] or 0),
+                    "fuera_horario": int(r[4] or 0),
+                    "no_tomadas":    int(r[5] or 0),
+                    "pendientes":    int(r[6] or 0),
+                })
+            pacientes_datos[id_pac] = {"nombre": nombre_pac, "datos": puntos}
+
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(f"Error al cargar gráfica: {e}", "danger")
+    return render_template("cuidador/grafica_adherencia.html",
+                           pacientes_datos=pacientes_datos,
+                           dias=dias)
 
 
 scheduler = BackgroundScheduler()

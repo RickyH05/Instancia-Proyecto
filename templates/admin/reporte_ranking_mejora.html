@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Ranking de Mejora{% endblock %}
+{% block page_title %}Ranking de Mejora de Adherencia{% endblock %}
+
+{% block content %}
+<!-- Selector rol -->
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+  {% for label, val in [('Todos',''),('Médicos','medico'),('Cuidadores','cuidador')] %}
+  <a href="{{ url_for('admin_reporte_ranking_mejora', rol=val) }}"
+     class="btn btn-sm {% if rol_filtro == val %}btn-primary{% else %}btn-ghost{% endif %}">
+    {{ label }}
+  </a>
+  {% endfor %}
+</div>
+
+{% if filas %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+
+  <!-- Panel izquierdo: barras comparativas -->
+  <div class="card">
+    <div class="card-header"><h3>Comparativa anterior vs. reciente</h3></div>
+    <div class="card-body">
+      <div id="chart-barras" style="height:{{ [filas|length * 38, 200]|max }}px;"></div>
+    </div>
+  </div>
+
+  <!-- Panel derecho: scatter -->
+  <div class="card">
+    <div class="card-header"><h3>Δ% vs Ranking</h3></div>
+    <div class="card-body">
+      <div id="chart-scatter" style="height:{{ [filas|length * 38, 200]|max }}px;"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Tabla -->
+<div class="card">
+  <div class="card-header"><h3>Detalle</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Rank</th><th>Nombre</th><th>Rol</th><th>% Anterior</th>
+        <th>% Reciente</th><th>Δ%</th><th>Clasificación</th>
+      </tr></thead>
+      <tbody>
+        {% for f in filas %}
+        {% set dc = '#1ABC9C' if f.delta_pct > 5 else ('#E74C3C' if f.delta_pct < -5 else '#F39C12') %}
+        <tr data-searchable>
+          <td style="font-weight:700;color:#1B4F72;">{{ f.rank_mejora }}</td>
+          <td style="font-weight:500;">{{ f.nombre }}</td>
+          <td><span class="badge badge-gray">{{ f.rol }}</span></td>
+          <td>{{ f.pct_anterior | round(1) }}%</td>
+          <td>{{ f.pct_reciente | round(1) }}%</td>
+          <td style="font-weight:700;color:{{ dc }};">
+            {% if f.delta_pct > 0 %}+{% endif %}{{ f.delta_pct | round(1) }}%
+          </td>
+          <td>
+            {% if 'MEJORA SIGNIFICATIVA' in f.clasificacion %}<span class="badge badge-green">{{ f.clasificacion }}</span>
+            {% elif 'MEJORA' in f.clasificacion %}<span class="badge" style="background:#D5F5E3;color:#1ABC9C;">{{ f.clasificacion }}</span>
+            {% elif 'DECLIVE SIGNIFICATIVO' in f.clasificacion %}<span class="badge badge-red">{{ f.clasificacion }}</span>
+            {% elif 'DECLIVE' in f.clasificacion %}<span class="badge badge-yellow">{{ f.clasificacion }}</span>
+            {% else %}<span class="badge badge-gray">{{ f.clasificacion }}</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="card-body">
+  <div class="empty-state">
+    <div class="empty-icon"><i data-lucide="bar-chart-2" style="width:40px;height:40px;color:#9CA3AF;"></i></div>
+    <p>Sin datos de ranking disponibles.</p>
+  </div>
+</div></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+{% if filas %}
+var nombres      = {{ filas | map(attribute='nombre')       | list | tojson }};
+var pctAnt       = {{ filas | map(attribute='pct_anterior') | list | tojson }};
+var pctRec       = {{ filas | map(attribute='pct_reciente') | list | tojson }};
+var deltaList    = {{ filas | map(attribute='delta_pct')    | list | tojson }};
+var rankList     = {{ filas | map(attribute='rank_mejora')  | list | tojson }};
+var clasifColors = [
+  {% for f in filas %}
+  '{% if f.delta_pct > 5 %}#1ABC9C{% elif f.delta_pct < -5 %}#E74C3C{% else %}#F39C12{% endif %}'
+  {% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+Highcharts.chart('chart-barras', {
+  chart: { type: 'bar', backgroundColor: 'transparent' },
+  title: { text: null },
+  xAxis: { categories: nombres, labels: { style: { color: '#5D6D7E', fontSize: '11px' } } },
+  yAxis: { min: 0, max: 100, title: null, labels: { format: '{value}%', style: { color: '#5D6D7E' } } },
+  tooltip: { valueSuffix: '%' },
+  legend: { itemStyle: { color: '#5D6D7E', fontSize: '12px' } },
+  plotOptions: { bar: { borderRadius: 2 } },
+  series: [
+    { name: 'Anterior', data: pctAnt, color: '#AEB6BF' },
+    { name: 'Reciente', data: pctRec, color: '#1ABC9C' }
+  ],
+  credits: { enabled: false }
+});
+
+var scatterData = [];
+for (var i = 0; i < deltaList.length; i++) {
+  scatterData.push({ x: deltaList[i], y: rankList[i], name: nombres[i], color: clasifColors[i] });
+}
+Highcharts.chart('chart-scatter', {
+  chart: { type: 'scatter', backgroundColor: 'transparent' },
+  title: { text: null },
+  xAxis: { title: { text: 'Δ% adherencia', style: { color: '#5D6D7E' } },
+           labels: { style: { color: '#5D6D7E' } }, plotLines: [{ value: 0, color: '#AEB6BF', width: 1 }] },
+  yAxis: { title: { text: 'Ranking', style: { color: '#5D6D7E' } },
+           labels: { style: { color: '#5D6D7E' } }, reversed: true },
+  tooltip: { formatter: function(){ return '<b>' + this.point.name + '</b><br/>Δ: ' + this.x.toFixed(1) + '%<br/>Rank: ' + this.y; } },
+  legend: { enabled: false },
+  plotOptions: { scatter: { marker: { radius: 6 } } },
+  series: [{ name: 'Personas', data: scatterData, colorByPoint: true }],
+  credits: { enabled: false }
+});
+{% endif %}
+</script>
+{% endblock %}

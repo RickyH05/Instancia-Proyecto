@@ -19,6 +19,15 @@
     <div><div class="stat-label">Alertas pendientes</div><div class="stat-value" style="color:#E74C3C;">{{ stats.alertas_pend }}</div></div>
     <div class="stat-icon" style="background:rgba(231,76,60,.10);"><i data-lucide="bell" style="width:22px;height:22px;color:#E74C3C;"></i></div>
   </div>
+  <a href="{{ url_for('cuidador_grafica_adherencia') }}" class="stat-card" style="text-decoration:none;">
+    <div>
+      <div class="stat-label">Mi gráfica de adherencia</div>
+      <div class="stat-value" style="color:#1B4F72;font-size:16px;margin-top:4px;">Ver →</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);">
+      <i data-lucide="bar-chart-2" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </a>
 </div>
 
 <div class="card" style="margin-bottom:20px;">

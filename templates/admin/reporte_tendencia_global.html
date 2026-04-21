@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Tendencia Global{% endblock %}
+{% block page_title %}Tendencia Global de Adherencia{% endblock %}
+
+{% block content %}
+<!-- Selector días -->
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+  {% for d in [14, 30, 60, 90] %}
+  <a href="{{ url_for('admin_reporte_tendencia_global', dias=d) }}"
+     class="btn btn-sm {% if dias == d %}btn-primary{% else %}btn-ghost{% endif %}">
+    {{ d }}d
+  </a>
+  {% endfor %}
+</div>
+
+{% if filas %}
+<div class="card" style="margin-bottom:24px;">
+  <div class="card-header"><h3>Promedio global diario — últimos {{ dias }} días</h3></div>
+  <div class="card-body">
+    <div id="chart-global" style="height:340px;"></div>
+  </div>
+</div>
+
+<!-- Tabla resumen por tendencia -->
+{% set grupos = {} %}
+{% for f in filas %}
+  {% if f.tendencia not in grupos %}{% set _ = grupos.update({f.tendencia: []}) %}{% endif %}
+  {% set _ = grupos[f.tendencia].append(f.paciente) %}
+{% endfor %}
+
+<div class="card">
+  <div class="card-header"><h3>Clasificación de pacientes por tendencia final</h3></div>
+  <div class="card-body" style="display:flex;gap:20px;flex-wrap:wrap;">
+    {% for tend, pacs in clasificacion.items() %}
+    {% set tc = '#1ABC9C' if tend == 'MEJORA' else ('#E74C3C' if tend == 'DECLIVE' else ('#F39C12' if tend == 'ESTABLE' else '#AEB6BF')) %}
+    <div style="flex:1;min-width:180px;">
+      <div style="font-weight:600;font-size:13px;color:{{ tc }};margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+        <i data-lucide="{% if tend == 'MEJORA' %}trending-up{% elif tend == 'DECLIVE' %}trending-down{% else %}minus{% endif %}"
+           style="width:14px;height:14px;"></i>
+        {{ tend }} ({{ pacs | unique | list | length }})
+      </div>
+      <ul style="list-style:none;padding:0;margin:0;">
+        {% for p in pacs | unique %}
+        <li style="font-size:12px;color:#5D6D7E;padding:2px 0;">{{ p }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="card-body">
+  <div class="empty-state">
+    <div class="empty-icon"><i data-lucide="trending-up" style="width:40px;height:40px;color:#9CA3AF;"></i></div>
+    <p>Sin datos para los últimos {{ dias }} días.</p>
+  </div>
+</div></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+{% if filas %}
+// Agrupar por fecha: calcular promedio, min y max de pct_dia
+var byFecha = {};
+{% for f in filas %}
+{% if f.pct_dia is not none %}
+var fd = {{ f.fecha | tojson }};
+if (!byFecha[fd]) byFecha[fd] = [];
+byFecha[fd].push({{ f.pct_dia }});
+{% endif %}
+{% endfor %}
+
+var fechas  = Object.keys(byFecha).sort();
+var promedios = [], rangos = [];
+fechas.forEach(function(f) {
+  var vals = byFecha[f];
+  var sum  = vals.reduce(function(a,b){ return a+b; }, 0);
+  var avg  = parseFloat((sum / vals.length).toFixed(2));
+  var mn   = parseFloat(Math.min.apply(null, vals).toFixed(2));
+  var mx   = parseFloat(Math.max.apply(null, vals).toFixed(2));
+  promedios.push(avg);
+  rangos.push([mn, mx]);
+});
+
+Highcharts.chart('chart-global', {
+  chart: { backgroundColor: 'transparent' },
+  title: { text: null },
+  xAxis: { categories: fechas, labels: { style: { color: '#5D6D7E', fontSize: '11px' }, rotation: -45 } },
+  yAxis: { min: 0, max: 100, title: { text: '% Adherencia', style: { color: '#5D6D7E' } },
+           labels: { format: '{value}%', style: { color: '#5D6D7E' } } },
+  tooltip: { shared: true, valueSuffix: '%' },
+  legend: { itemStyle: { color: '#5D6D7E', fontSize: '12px' } },
+  series: [
+    { name: 'Rango (min–max)', type: 'arearange', data: rangos,
+      color: '#5DADE2', fillOpacity: 0.15, lineWidth: 0, marker: { enabled: false } },
+    { name: 'Promedio global', type: 'line', data: promedios,
+      color: '#1B4F72', lineWidth: 2, marker: { radius: 3 } }
+  ],
+  credits: { enabled: false }
+});
+{% endif %}
+</script>
+{% endblock %}

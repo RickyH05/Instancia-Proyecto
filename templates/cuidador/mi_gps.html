@@ -46,18 +46,7 @@
     <span style="font-size:12px;color:#5D6D7E;">{{ ultima_ubicacion.ts }}</span>
   </div>
   <div class="card-body">
-    <svg viewBox="0 0 480 240" style="width:100%;background:#EEF2F7;border-radius:8px;margin-bottom:12px;">
-      <line x1="0" y1="80"  x2="480" y2="80"  stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
-      <line x1="0" y1="160" x2="480" y2="160" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
-      <line x1="120" y1="0" x2="120" y2="240" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
-      <line x1="240" y1="0" x2="240" y2="240" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
-      <line x1="360" y1="0" x2="360" y2="240" stroke="#D1D5DB" stroke-width="0.5" stroke-dasharray="4 4"/>
-      <rect x="0" y="110" width="480" height="4" rx="2" fill="#CBD5E1"/>
-      <rect x="220" y="0"  width="4" height="240" rx="2" fill="#CBD5E1"/>
-      <circle cx="240" cy="120" r="16" fill="#1ABC9C" fill-opacity="0.15"/>
-      <circle cx="240" cy="120" r="8"  fill="#1ABC9C" stroke="white" stroke-width="2.5"/>
-      <text x="240" y="104" text-anchor="middle" fill="#1ABC9C" font-size="10" font-weight="600">Actual</text>
-    </svg>
+    <div id="map" style="height:400px;width:100%;border-radius:8px;margin-bottom:12px;z-index:0;"></div>
     <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(26,188,156,.06);border:1px solid rgba(26,188,156,.15);border-radius:8px;">
       <i data-lucide="map-pin" style="width:16px;height:16px;color:#1ABC9C;flex-shrink:0;"></i>
       <div>
@@ -106,4 +95,31 @@
 {% endif %}
 
 {% endblock %}
-{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+lucide.createIcons();
+{% if ultima_ubicacion %}
+var lat = {{ ultima_ubicacion.lat }};
+var lng = {{ ultima_ubicacion.lon }};
+var map = L.map('map').setView([lat, lng], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(map);
+L.marker([lat, lng]).addTo(map)
+  .bindPopup('Última posición — {{ ultima_ubicacion.ts }}')
+  .openPopup();
+{% for pos in posiciones %}
+{% if not loop.first %}
+L.circleMarker([{{ pos.lat }}, {{ pos.lon }}], { radius: 5, color: '#AEB6BF', fillOpacity: 0.7 })
+  .addTo(map).bindPopup('{{ pos.ts }}');
+{% endif %}
+{% endfor %}
+setTimeout(function(){ map.invalidateSize(); }, 100);
+{% endif %}
+</script>
+{% endblock %}

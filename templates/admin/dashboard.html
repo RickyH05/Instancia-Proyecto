@@ -106,5 +106,26 @@
     </table>
   </div>
 </div>
+<!-- Accesos rápidos reportes -->
+<div class="stats-grid stats-grid-3" style="margin-top:20px;">
+  <a href="{{ url_for('admin_reporte_ranking_mejora') }}" class="stat-card" style="text-decoration:none;">
+    <div>
+      <div class="stat-label">Ranking mejora adherencia</div>
+      <div class="stat-value" style="color:#1B4F72;font-size:16px;margin-top:4px;">Ver →</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);">
+      <i data-lucide="trophy" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </a>
+  <a href="{{ url_for('admin_reporte_tendencia_global') }}" class="stat-card" style="text-decoration:none;">
+    <div>
+      <div class="stat-label">Tendencia global adherencia</div>
+      <div class="stat-value" style="color:#1ABC9C;font-size:16px;margin-top:4px;">Ver →</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);">
+      <i data-lucide="trending-up" style="width:22px;height:22px;color:#1ABC9C;"></i>
+    </div>
+  </a>
+</div>
 {% endblock %}
 {% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

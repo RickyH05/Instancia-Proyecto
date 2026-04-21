@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Gráfica de Tomas{% endblock %}
+{% block page_title %}Gráfica de Tomas{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('doctor_paciente_perfil', id=id_pac) }}" class="btn btn-ghost btn-sm"
+   style="margin-bottom:16px;display:inline-flex;align-items:center;gap:6px;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver al perfil
+</a>
+
+<div class="card">
+  <div class="card-header">
+    <h3 style="font-size:16px;font-weight:600;color:#2C3E50;">
+      Tomas diarias — {{ nombre_paciente }}
+    </h3>
+    <!-- Selector de días -->
+    <div style="display:flex;gap:6px;">
+      {% for d in [7, 14, 30] %}
+      <a href="{{ url_for('doctor_grafica_tomas', id_pac=id_pac, dias=d) }}"
+         class="btn btn-sm {% if dias == d %}btn-primary{% else %}btn-ghost{% endif %}">
+        {{ d }}d
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card-body">
+    {% if datos %}
+    <div id="chart-tomas" style="height:380px;"></div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon"><i data-lucide="bar-chart-2" style="width:40px;height:40px;color:#9CA3AF;"></i></div>
+      <p>Sin datos de tomas para los últimos {{ dias }} días.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+{% if datos %}
+var categorias = {{ datos | map(attribute='fecha') | list | tojson }};
+var correctas   = {{ datos | map(attribute='correctas')     | list | tojson }};
+var fueraH      = {{ datos | map(attribute='fuera_horario') | list | tojson }};
+var noTomadas   = {{ datos | map(attribute='no_tomadas')    | list | tojson }};
+var pendientes  = {{ datos | map(attribute='pendientes')    | list | tojson }};
+
+Highcharts.chart('chart-tomas', {
+  chart: { type: 'column', backgroundColor: 'transparent' },
+  title: { text: null },
+  xAxis: { categories: categorias, labels: { style: { color: '#5D6D7E', fontSize: '11px' }, rotation: -45 } },
+  yAxis: { min: 0, title: { text: 'Tomas', style: { color: '#5D6D7E' } },
+           stackLabels: { enabled: false },
+           labels: { style: { color: '#5D6D7E' } } },
+  tooltip: { headerFormat: '<b>{point.x}</b><br/>', pointFormat: '{series.name}: {point.y}<br/>Total: {point.stackTotal}', shared: false },
+  plotOptions: { column: { stacking: 'normal', borderRadius: 2, dataLabels: { enabled: false } } },
+  legend: { itemStyle: { color: '#5D6D7E', fontSize: '12px' } },
+  series: [
+    { name: 'Correctas',     data: correctas,  color: '#1ABC9C' },
+    { name: 'Fuera horario', data: fueraH,     color: '#F39C12' },
+    { name: 'No tomadas',    data: noTomadas,  color: '#E74C3C' },
+    { name: 'Pendientes',    data: pendientes, color: '#AEB6BF' }
+  ],
+  credits: { enabled: false }
+});
+{% endif %}
+</script>
+{% endblock %}

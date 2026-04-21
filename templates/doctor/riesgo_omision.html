@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Riesgo de Omisión{% endblock %}
+{% block page_title %}Riesgo de Omisión{% endblock %}
+
+{% block content %}
+<!-- Filtros -->
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+  <a href="{{ url_for('doctor_riesgo_omision', activas=1) }}"
+     class="btn btn-sm {% if solo_activas %}btn-primary{% else %}btn-ghost{% endif %}">
+    Solo activas
+  </a>
+  <a href="{{ url_for('doctor_riesgo_omision', activas=0) }}"
+     class="btn btn-sm {% if not solo_activas %}btn-primary{% else %}btn-ghost{% endif %}">
+    Todas
+  </a>
+</div>
+
+{% macro nivel_badge(n) %}
+  {% if n == 'CRÍTICO' %}<span class="badge badge-red">{{ n }}</span>
+  {% elif n == 'ALTO' %}<span class="badge badge-yellow">{{ n }}</span>
+  {% else %}<span class="badge badge-gray">{{ n }}</span>{% endif %}
+{% endmacro %}
+
+<div class="card" style="margin-bottom:24px;">
+  <div class="card-header"><h3>Rachas de omisión de mis pacientes</h3></div>
+  {% if filas %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Paciente</th><th>Medicamento</th><th>Días consecutivos</th>
+        <th>Nivel riesgo</th><th>Activa</th><th>Última omisión hace</th>
+      </tr></thead>
+      <tbody>
+        {% for f in filas %}
+        <tr data-searchable>
+          <td style="font-weight:500;">{{ f.paciente }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ f.medicamento }}</td>
+          <td style="font-weight:700;color:#E74C3C;">{{ f.dias_consecutivos }}</td>
+          <td>{{ nivel_badge(f.nivel_riesgo) }}</td>
+          <td>
+            {% if f.racha_activa %}
+            <span class="badge badge-red">Activa</span>
+            {% else %}
+            <span class="badge badge-gray">Cerrada</span>
+            {% endif %}
+          </td>
+          <td style="font-size:13px;color:#5D6D7E;">
+            {% if f.racha_activa %}{{ f.dias_desde_ultima_omision }}d{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body">
+    <div class="empty-state">
+      <div class="empty-icon"><i data-lucide="shield-check" style="width:40px;height:40px;color:#9CA3AF;"></i></div>
+      <p>Sin rachas de omisión detectadas para tus pacientes.</p>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% set top10 = filas[:10] %}
+{% if top10 %}
+<div class="card">
+  <div class="card-header"><h3>Top 10 — Días consecutivos</h3></div>
+  <div class="card-body">
+    <div id="chart-riesgo" style="height:{{ [top10|length * 42, 180]|max }}px;"></div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+{% if filas %}
+{% set top10 = filas[:10] %}
+var categorias = {{ top10 | map(attribute='paciente') | list | tojson }};
+var valores     = {{ top10 | map(attribute='dias_consecutivos') | list | tojson }};
+var colores = [
+  {% for f in top10 %}
+  '{% if f.nivel_riesgo == "CRÍTICO" %}#E74C3C{% elif f.nivel_riesgo == "ALTO" %}#F39C12{% else %}#AEB6BF{% endif %}'
+  {% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+Highcharts.chart('chart-riesgo', {
+  chart: { type: 'bar', backgroundColor: 'transparent' },
+  title: { text: null },
+  xAxis: { categories: categorias, labels: { style: { color: '#5D6D7E', fontSize: '12px' } } },
+  yAxis: { min: 0, title: { text: 'Días consecutivos', style: { color: '#5D6D7E' } },
+           labels: { style: { color: '#5D6D7E' } } },
+  tooltip: { valueSuffix: ' días' },
+  legend: { enabled: false },
+  plotOptions: { bar: { borderRadius: 3, colorByPoint: true,
+    dataLabels: { enabled: true, style: { fontSize: '11px', textOutline: 'none', color: '#5D6D7E' } } } },
+  colors: colores,
+  series: [{ name: 'Días', data: valores }],
+  credits: { enabled: false }
+});
+{% endif %}
+</script>
+{% endblock %}

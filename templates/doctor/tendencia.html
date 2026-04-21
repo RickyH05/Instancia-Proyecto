@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Tendencia de Adherencia{% endblock %}
+{% block page_title %}Tendencia de Adherencia{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('doctor_paciente_perfil', id=id_pac) }}" class="btn btn-ghost btn-sm"
+   style="margin-bottom:16px;display:inline-flex;align-items:center;gap:6px;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver al perfil
+</a>
+
+{% if tendencia_global %}
+{% set tc = '#1ABC9C' if tendencia_global == 'MEJORA' else ('#E74C3C' if tendencia_global == 'DECLIVE' else ('#F39C12' if tendencia_global == 'ESTABLE' else '#AEB6BF')) %}
+<div style="margin-bottom:16px;">
+  <span style="display:inline-flex;align-items:center;gap:8px;background:{{ tc }}18;border:1px solid {{ tc }}44;
+               border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;color:{{ tc }};">
+    <i data-lucide="{% if tendencia_global == 'MEJORA' %}trending-up{% elif tendencia_global == 'DECLIVE' %}trending-down{% else %}minus{% endif %}"
+       style="width:15px;height:15px;"></i>
+    Tendencia: {{ tendencia_global }}
+  </span>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header">
+    <h3 style="font-size:16px;font-weight:600;color:#2C3E50;">
+      Adherencia — {{ nombre_paciente }}
+    </h3>
+    <div style="display:flex;gap:6px;">
+      {% for d in [14, 30, 60] %}
+      <a href="{{ url_for('doctor_tendencia', id_pac=id_pac, dias=d) }}"
+         class="btn btn-sm {% if dias == d %}btn-primary{% else %}btn-ghost{% endif %}">
+        {{ d }}d
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card-body">
+    {% if datos %}
+    <div id="chart-tendencia" style="height:360px;"></div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon"><i data-lucide="trending-up" style="width:40px;height:40px;color:#9CA3AF;"></i></div>
+      <p>Sin datos para los últimos {{ dias }} días.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+{% if datos %}
+var fechas  = {{ datos | map(attribute='fecha') | list | tojson }};
+var pctDia  = {{ datos | map(attribute='pct_dia') | list | tojson }};
+var mov7d   = {{ datos | map(attribute='mov7d')   | list | tojson }};
+
+Highcharts.chart('chart-tendencia', {
+  chart: { backgroundColor: 'transparent' },
+  title: { text: null },
+  xAxis: { categories: fechas, labels: { style: { color: '#5D6D7E', fontSize: '11px' }, rotation: -45 } },
+  yAxis: { min: 0, max: 100, title: { text: '% Adherencia', style: { color: '#5D6D7E' } },
+           labels: { format: '{value}%', style: { color: '#5D6D7E' } } },
+  tooltip: { valueSuffix: '%', shared: true },
+  legend: { itemStyle: { color: '#5D6D7E', fontSize: '12px' } },
+  series: [
+    { name: '% diario', type: 'spline', data: pctDia,
+      color: '#5DADE2', opacity: 0.5, lineWidth: 1,
+      marker: { radius: 3 } },
+    { name: 'Promedio móvil 7d', type: 'line', data: mov7d,
+      color: '#1B4F72', lineWidth: 3,
+      marker: { radius: 0 } }
+  ],
+  credits: { enabled: false }
+});
+{% endif %}
+</script>
+{% endblock %}

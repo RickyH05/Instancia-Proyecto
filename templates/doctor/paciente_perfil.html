@@ -4,9 +4,17 @@
 {% block page_title %}Perfil del Paciente{% endblock %}
 
 {% block content %}
-<a href="{{ url_for('doctor_pacientes') }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;display:inline-flex;">
-  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver a Pacientes
-</a>
+<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+  <a href="{{ url_for('doctor_pacientes') }}" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;">
+    <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver a Pacientes
+  </a>
+  <a href="{{ url_for('doctor_grafica_tomas', id_pac=id) }}" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;">
+    <i data-lucide="bar-chart-2" style="width:15px;height:15px;"></i> Gráfica de tomas
+  </a>
+  <a href="{{ url_for('doctor_tendencia', id_pac=id) }}" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;">
+    <i data-lucide="trending-up" style="width:15px;height:15px;"></i> Ver tendencia
+  </a>
+</div>
 
 <!-- Header paciente -->
 <div style="background:#ffffff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:20px;">
@@ -166,6 +174,11 @@
         <span class="badge badge-green">Principal</span>
         {% else %}
         <span class="badge badge-gray">Apoyo</span>
+        <button onclick="desasignarCuidador({{ r[0] }}, '{{ r[4] }}')"
+          class="btn btn-ghost btn-icon btn-sm" title="Desasignar"
+          style="margin-left:4px;">
+          <i data-lucide="user-x" style="width:14px;height:14px;color:#E74C3C;"></i>
+        </button>
         {% endif %}
         <i data-lucide="chevron-right" style="width:14px;height:14px;color:#9CA3AF;"></i>
       </div>
@@ -175,6 +188,38 @@
     <p style="font-size:14px;color:#9CA3AF;">Sin cuidador asignado.</p>
     {% endif %}
   </div>
+
+<!-- Modal confirmar desasignar -->
+<div id="modal-desasignar" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-desasignar')" style="display:none;">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#E74C3C;">Confirmar desasignación</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-desasignar')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('doctor_desasignar_cuidador', id_pac=id) }}">
+      <input type="hidden" id="del-vinculo-id" name="id_paciente_cuidador" value="">
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+          </div>
+          <div>
+            <div id="del-vinculo-nombre" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:4px;"></div>
+            <div style="font-size:13px;color:#5D6D7E;">Se desasignará este cuidador del paciente.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-desasignar')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" style="background:#E74C3C;border-color:#E74C3C;">
+          <i data-lucide="user-x" style="width:14px;height:14px;"></i> Desasignar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 
   <!-- ── TAB: Alertas ── -->
   <div id="tab-alertas" style="padding:20px;display:none;">
@@ -306,6 +351,12 @@ Highcharts.chart('gauge_perfil', {
 document.getElementById('gauge_perfil').innerHTML =
   '<div style="height:90px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#9CA3AF;text-align:center;line-height:1.4;">Sin<br>datos</div>';
 {% endif %}
+
+function desasignarCuidador(id_pac_cuid, nombre) {
+  document.getElementById('del-vinculo-id').value = id_pac_cuid;
+  document.getElementById('del-vinculo-nombre').textContent = '¿Desasignar a ' + nombre + '?';
+  document.getElementById('modal-desasignar').style.display = 'flex';
+}
 
 // Tabs
 function showTab(id, btn) {

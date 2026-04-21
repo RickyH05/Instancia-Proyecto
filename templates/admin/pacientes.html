@@ -28,12 +28,12 @@
       </tr></thead>
       <tbody>
         {% for p in pacientes %}
-        {# p: (0=id, 1=nombre, 2=apellido_p, 3=apellido_m, 4=curp, 5=fecha_nac, 6=activo, 7=foto_perfil) #}
+        {# p: (0=id, 1=nombre, 2=apellido_p, 3=apellido_m, 4=fecha_nac, 5=curp, 6=activo, 7=foto_perfil) #}
         <tr data-searchable>
           <td>{{ avatar(p[7], p[1] ~ ' ' ~ p[2], 34) }}</td>
           <td style="font-weight:500;">{{ p[1] }} {{ p[2] }} {{ p[3] }}</td>
-          <td style="font-family:monospace;font-size:12px;color:#5D6D7E;">{{ p[4] or '—' }}</td>
-          <td style="font-size:13px;color:#5D6D7E;">{{ p[5] or '—' }}</td>
+          <td style="font-family:monospace;font-size:12px;color:#5D6D7E;">{{ p[5] or '—' }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ p[4] or '—' }}</td>
           <td>
             {% if p[6] %}<span class="badge badge-green">Activo</span>
             {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
@@ -48,7 +48,7 @@
               <i data-lucide="users" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
-              onclick="editPac({{ p[0] }},'{{ p[1]|e }}','{{ p[2]|e }}','{{ p[3]|e }}','{{ p[4]|e }}','{{ p[5] }}')">
+              onclick="editPac({{ p[0] }},'{{ p[1]|e }}','{{ p[2]|e }}','{{ p[3]|e }}','{{ p[5]|e }}','{{ p[4] }}')">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
             {% if p[6] %}

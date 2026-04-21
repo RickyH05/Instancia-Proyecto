@@ -5,9 +5,7 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
-.md
-docs/
-.claude/
+
 
 # Fotos de perfil subidas por usuarios
 static/img/uploads/*
