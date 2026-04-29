@@ -341,7 +341,18 @@ CALL sp_gestion_medicamento(
 )
 ```
 
-**Cursor devuelve:** `id_medicamento, nombre_generico, codigo_atc, dosis_max, activo, unidad`
+**Cursor devuelve (todas las acciones):**
+`id_medicamento, nombre_generico, codigo_atc, dosis_max, activo, unidad, id_unidad`
+
+| col | campo |
+|-----|-------|
+| 0 | id_medicamento |
+| 1 | nombre_generico |
+| 2 | codigo_atc |
+| 3 | dosis_max |
+| 4 | activo |
+| 5 | unidad (abreviatura) |
+| 6 | id_unidad ← necesario para pre-seleccionar el `<select>` en modales de edición |
 
 ```python
 # INSERT
@@ -352,6 +363,15 @@ cur.execute(
 )
 p_id, p_ok, p_msg = cur.fetchone()
 conn.commit()
+
+# LISTAR activos (para tabla + modal de edición)
+cur.execute("BEGIN")
+cur.execute("CALL sp_gestion_medicamento('L', NULL, NULL, NULL, 'cur_med_l')")
+_, p_ok, p_msg = cur.fetchone()
+cur.execute("FETCH ALL FROM cur_med_l")
+medicamentos = cur.fetchall()
+conn.commit()
+# En template: m[0]=id, m[1]=nombre, m[2]=atc, m[3]=dosis_max, m[5]=unidad, m[6]=id_unidad
 ```
 
 ---
@@ -360,12 +380,12 @@ conn.commit()
 
 ### `sp_gestion_diagnostico`
 
-Solo acepta `'I'` y `'U'`. Los diagnósticos no se eliminan.
+Acepta `'I'`, `'U'` y `'L'`. Los diagnósticos no se eliminan.
 
 **Firma completa:**
 ```sql
 CALL sp_gestion_diagnostico(
-    p_acc       CHAR(1),
+    p_acc       CHAR(1),              -- 'I', 'U', 'L'
     p_id        INTEGER INOUT,
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
@@ -377,6 +397,15 @@ CALL sp_gestion_diagnostico(
 **Cursor devuelve:** `id_diagnostico, descripcion`
 
 ```python
+# LISTAR todos (para poblar <select>)
+cur.execute("BEGIN")
+cur.execute("CALL sp_gestion_diagnostico('L', NULL, NULL, NULL, 'cur_diag_l')")
+_, p_ok, p_msg = cur.fetchone()
+cur.execute("FETCH ALL FROM cur_diag_l")
+diagnosticos = cur.fetchall()
+conn.commit()
+
+# INSERT
 cur.execute("BEGIN")
 cur.execute("CALL sp_gestion_diagnostico('I', NULL, NULL, NULL, 'cur1', %s)", ['Diabetes Tipo 2'])
 p_id, p_ok, p_msg = cur.fetchone()
@@ -389,12 +418,12 @@ conn.commit()
 
 ### `sp_gestion_especialidad`
 
-Solo acepta `'I'` y `'U'`.
+Acepta `'I'`, `'U'` y `'L'`.
 
 **Firma completa:**
 ```sql
 CALL sp_gestion_especialidad(
-    p_acc       CHAR(1),
+    p_acc       CHAR(1),              -- 'I', 'U', 'L'
     p_id        INTEGER INOUT,
     p_ok        INTEGER OUT,
     p_msg       VARCHAR(300) OUT,
@@ -406,6 +435,15 @@ CALL sp_gestion_especialidad(
 **Cursor devuelve:** `id_especialidad, descripcion`
 
 ```python
+# LISTAR todas (para poblar <select>)
+cur.execute("BEGIN")
+cur.execute("CALL sp_gestion_especialidad('L', NULL, NULL, NULL, 'cur_esp_l')")
+_, p_ok, p_msg = cur.fetchone()
+cur.execute("FETCH ALL FROM cur_esp_l")
+especialidades = cur.fetchall()
+conn.commit()
+
+# INSERT
 cur.execute("BEGIN")
 cur.execute("CALL sp_gestion_especialidad('I', NULL, NULL, NULL, 'cur1', %s)", ['Cardiología'])
 p_id, p_ok, p_msg = cur.fetchone()
@@ -758,6 +796,8 @@ print(f"Omisiones detectadas: {p_total}")
 
 ### `sp_asignar_diagnostico`
 
+**Ruta Flask:** `POST /medico/paciente/<id_pac>/asignar-diagnostico` → `medico_asignar_diagnostico` (`@rol_requerido('medico')`)
+
 **Firma completa:**
 ```sql
 CALL sp_asignar_diagnostico(
@@ -771,14 +811,38 @@ CALL sp_asignar_diagnostico(
 
 **Cursor devuelve:** `id_paciente, paciente, id_diagnostico, diagnostico, activo`
 
+**Notas:**
+- Si el diagnóstico ya existía pero estaba inactivo, lo reactiva (`ON CONFLICT DO UPDATE SET activo = TRUE`).
+- Requiere auditoría: ejecutar `set_config` **antes** del `BEGIN`.
+- Para poblar el `<select>` del formulario usar `sp_gestion_diagnostico('L', ...)` en el GET del perfil.
+
 ```python
+# En la ruta GET — cargar catálogo para el <select>
+cur.execute("BEGIN")
+cur.execute("CALL sp_gestion_diagnostico('L', NULL, NULL, NULL, 'cur_diag_cat')")
+_, p_ok_cat, _ = cur.fetchone()
+if p_ok_cat != 1:
+    conn.rollback()
+else:
+    cur.execute("FETCH ALL FROM cur_diag_cat")
+    diagnosticos_catalogo = cur.fetchall()  # d[0]=id_diagnostico, d[1]=descripcion
+    conn.commit()
+
+# En la ruta POST — asignar con auditoría
+cur.execute("SELECT set_config('medi_nfc2.id_usuario_app', %s, TRUE)", [str(session['user_id'])])
 cur.execute("BEGIN")
 cur.execute(
-    "CALL sp_asignar_diagnostico(%s, %s, NULL, NULL, 'cur1')",
-    [id_paciente, id_diagnostico]
+    "CALL sp_asignar_diagnostico(%s, %s, NULL, NULL, 'cur_asig_diag')",
+    [id_pac, id_diagnostico]
 )
-p_ok, p_msg = cur.fetchone()
-conn.commit()
+p_ok, p_msg = cur.fetchone()[:2]
+cur.execute("FETCH ALL FROM cur_asig_diag")
+if p_ok == 1:
+    conn.commit()
+    flash(p_msg, 'success')
+else:
+    conn.rollback()
+    flash(p_msg, 'danger')
 ```
 
 ---
@@ -1310,7 +1374,184 @@ conn.commit()
 
 ---
 
-## 19. Triggers automáticos (no llamar directamente)
+## 19. SPs nuevos (agregados post-v9)
+
+### `sp_gestion_etiqueta_nfc`
+
+Gestión de etiquetas NFC: registrar, actualizar estado, listar por receta.
+
+**Firma completa:**
+```sql
+CALL sp_gestion_etiqueta_nfc(
+    p_acc       CHAR(1),                    -- 'I', 'U', 'L'
+    p_uid       VARCHAR(100) INOUT,         -- UID de la etiqueta
+    p_ok        INTEGER OUT,
+    p_msg       VARCHAR(300) OUT,
+    io_cursor   REFCURSOR INOUT,
+    p_nombre    VARCHAR(150)         DEFAULT NULL,
+    p_tipo      VARCHAR(100)         DEFAULT NULL,
+    p_rm        INTEGER              DEFAULT NULL,  -- FK receta_medicamento.id_receta_medicamento
+    p_estado    estado_etiqueta_enum DEFAULT 'activo'
+)
+```
+
+**Cursor devuelve:** `uid_nfc, nombre, tipo_etiqueta, id_receta_medicamento, estado_etiqueta, fecha_registro`
+
+```python
+# INSERT (reemplaza INSERT directo en etiqueta_nfc)
+cur.execute("BEGIN")
+cur.execute(
+    "CALL sp_gestion_etiqueta_nfc('I', %s, NULL, NULL, 'cur_nfc', %s, %s, %s, %s)",
+    [uid_nfc, nombre_etiqueta, tipo_etiqueta, id_receta_medicamento, 'activo']
+)
+p_uid, p_ok, p_msg = cur.fetchone()
+cur.execute("FETCH ALL FROM cur_nfc")
+conn.commit()
+
+# LISTAR por receta_medicamento
+cur.execute("BEGIN")
+cur.execute(
+    "CALL sp_gestion_etiqueta_nfc('L', NULL, NULL, NULL, 'cur_nfc_l', NULL, NULL, %s)",
+    [id_receta_medicamento]
+)
+p_uid, p_ok, p_msg = cur.fetchone()
+cur.execute("FETCH ALL FROM cur_nfc_l")
+etiquetas = cur.fetchall()
+conn.commit()
+```
+
+---
+
+### `sp_rep_gps_cuidador`
+
+GPS activo del cuidador con su última ubicación registrada.
+
+**Firma:** `(INOUT io_cursor, IN p_cuidador INTEGER)`
+
+**Columnas:**
+
+| col | campo |
+|-----|-------|
+| 0 | id_gps |
+| 1 | imei |
+| 2 | modelo |
+| 3 | activo |
+| 4 | fecha_asignacion |
+| 5 | latitud |
+| 6 | longitud |
+| 7 | timestamp_ubicacion |
+
+```python
+# Reemplaza SELECT directo a gps_imei + ubicacion_gps
+cur.execute("BEGIN")
+cur.execute("CALL sp_rep_gps_cuidador('cur_gps', %s)", [id_cuidador])
+cur.execute("FETCH ALL FROM cur_gps")
+gps_row = cur.fetchone()   # None si el cuidador no tiene GPS activo
+conn.commit()
+
+if gps_row:
+    imei      = gps_row[1]
+    latitud   = gps_row[5]
+    longitud  = gps_row[6]
+    ultima_ts = gps_row[7]
+```
+
+---
+
+### `sp_rep_perfil_paciente_foto`
+
+Igual que `sp_rep_perfil_paciente` pero incluye `foto_perfil`.
+
+**Firma:** `(INOUT io_cursor, IN p_paciente INTEGER)`
+
+**Columnas:**
+
+| col | campo |
+|-----|-------|
+| 0 | id_paciente |
+| 1 | nombre |
+| 2 | apellido_p |
+| 3 | apellido_m |
+| 4 | fecha_nacimiento |
+| 5 | curp |
+| 6 | activo |
+| 7 | foto_perfil ← col extra vs sp_rep_perfil_paciente |
+| 8 | diagnosticos |
+| 9 | cuidador_princ |
+| 10 | medicamentos |
+
+```python
+# Reemplaza SELECT foto_perfil FROM paciente WHERE id_paciente = %s
+cur.execute("BEGIN")
+cur.execute("CALL sp_rep_perfil_paciente_foto('cur_perf', %s)", [id_paciente])
+cur.execute("FETCH ALL FROM cur_perf")
+row = cur.fetchone()
+conn.commit()
+
+foto     = row[7]
+nombre   = row[1]
+apellido = row[2]
+```
+
+---
+
+### `sp_rep_conteos_admin`
+
+Todos los conteos del dashboard admin en **una sola fila**.
+
+**Firma:** `(INOUT io_cursor)`
+
+**Columnas:**
+
+| col | campo |
+|-----|-------|
+| 0 | total_medicos |
+| 1 | total_cuidadores |
+| 2 | total_pacientes |
+| 3 | total_medicamentos |
+| 4 | total_gps |
+| 5 | total_beacon |
+| 6 | total_alertas_pendientes |
+
+```python
+# Reemplaza los 7 SELECT COUNT(*) directos del admin_dashboard
+cur.execute("BEGIN")
+cur.execute("CALL sp_rep_conteos_admin('cur_conteos')")
+cur.execute("FETCH ALL FROM cur_conteos")
+row = cur.fetchone()
+conn.commit()
+
+total_medicos            = row[0]
+total_cuidadores         = row[1]
+total_pacientes          = row[2]
+total_medicamentos       = row[3]
+total_gps                = row[4]
+total_beacon             = row[5]
+total_alertas_pendientes = row[6]
+```
+
+---
+
+### `sp_rep_unidades_dosis`
+
+Lista todas las unidades de dosis para poblar `<select>` en formularios.
+
+**Firma:** `(INOUT io_cursor)`
+
+**Columnas:** `id_unidad, abreviatura, descripcion`
+
+```python
+cur.execute("BEGIN")
+cur.execute("CALL sp_rep_unidades_dosis('cur_uni')")
+cur.execute("FETCH ALL FROM cur_uni")
+unidades = cur.fetchall()
+conn.commit()
+# En template: u[0]=id_unidad, u[1]=abreviatura, u[2]=descripcion
+```
+
+---
+
+## 20. Triggers automáticos (no llamar directamente)
 
 | Trigger | Tabla | Momento | Qué hace |
 |---------|-------|---------|----------|
@@ -1334,8 +1575,8 @@ conn.commit()
 | `sp_gestion_medico` | I/U/D/L | Admin |
 | `sp_gestion_cuidador` | I/U/D/L/R | Admin |
 | `sp_gestion_medicamento` | I/U/D/L | Admin |
-| `sp_gestion_diagnostico` | I/U | Admin |
-| `sp_gestion_especialidad` | I/U | Admin |
+| `sp_gestion_diagnostico` | I/U/L | Admin |
+| `sp_gestion_especialidad` | I/U/L | Admin |
 | `sp_gestion_beacon` | I/U/D | Admin |
 | `sp_gestion_gps` | I/U/D | Admin |
 | `sp_gestion_horario` | I/D/L | Admin/Médico |
@@ -1351,6 +1592,7 @@ conn.commit()
 | `sp_desasignar_cuidador` | — | Admin |
 | `sp_asignar_especialidad` | — | Admin |
 | `sp_crear_usuario_admin` | — | Admin |
+| `sp_gestion_etiqueta_nfc` | I/U/L | Admin/Médico |
 | ~~`sp_login`~~ | — | ~~No usar~~ |
 
 ### Reportes sp_rep_* (31 SPs)
@@ -1387,3 +1629,7 @@ conn.commit()
 | `sp_rep_pacientes_medico_admin` | Admin |
 | `sp_rep_lista_cuidadores` | Admin |
 | `sp_rep_lista_usuarios` | Admin |
+| `sp_rep_gps_cuidador` | Cuidador/Admin |
+| `sp_rep_perfil_paciente_foto` | Médico/Cuidador |
+| `sp_rep_conteos_admin` | Admin |
+| `sp_rep_unidades_dosis` | Admin |

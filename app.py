@@ -332,7 +332,7 @@ def admin_medicos():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_medico('L', NULL, NULL, NULL, 'cur_med_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_med_l")
         medicos = cur.fetchall()
         conn.commit()
@@ -400,7 +400,7 @@ def admin_cuidadores():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_cuidador('L', NULL, NULL, NULL, 'cur_cuid_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_cuid_l")
         cuidadores = cur.fetchall()
         conn.commit()
@@ -530,7 +530,7 @@ def admin_medicamentos():
 
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_medicamento('L', NULL, NULL, NULL, 'cur_med_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_med_l")
         medicamentos = cur.fetchall()
         conn.commit()
@@ -593,7 +593,7 @@ def admin_diagnosticos():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_diagnostico('L', NULL, NULL, NULL, 'cur_diag_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_diag_l")
         diagnosticos = cur.fetchall()
         conn.commit()
@@ -649,7 +649,7 @@ def admin_especialidades():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_especialidad('L', NULL, NULL, NULL, 'cur_esp_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_esp_l")
         especialidades = cur.fetchall()
         conn.commit()
@@ -721,7 +721,7 @@ def admin_beacon():
         conn.commit()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_paciente('L', NULL, NULL, NULL, 'cur_pac_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_pac_l")
         pacientes = [(r[0], f"{r[1]} {r[2]} {r[3] or ''}".strip()) for r in cur.fetchall()]
         conn.commit()
@@ -1040,7 +1040,7 @@ def admin_omisiones():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_detectar_omisiones(NULL, NULL, NULL, 'cur_omisiones')")
-        p_ok, p_msg, p_total = cur.fetchone()
+        p_ok, p_msg, p_total, _ = cur.fetchone()
         conn.commit()
         cur.close(); conn.close()
         flash(
@@ -1728,6 +1728,17 @@ def doctor_paciente_perfil(id):
         vinculos = [r for r in cur.fetchall() if r[3]]  # solo activos
         conn.commit()
 
+        # ── catálogo de diagnósticos para el formulario de asignación ────────
+        diagnosticos_catalogo = []
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_diagnostico('L', NULL, NULL, NULL, 'cur_diag_cat')")
+        _, p_ok_cat, _msg, _ = cur.fetchone()
+        if p_ok_cat != 1:
+            conn.rollback()
+        cur.execute("FETCH ALL FROM cur_diag_cat")
+        diagnosticos_catalogo = cur.fetchall()
+        conn.commit()
+
         cur.close()
         conn.close()
 
@@ -1742,7 +1753,46 @@ def doctor_paciente_perfil(id):
         alertas=alertas,
         recetas=list(recetas.values()),
         vinculos=vinculos,
+        diagnosticos_catalogo=diagnosticos_catalogo,
     )
+
+
+@app.route("/medico/paciente/<int:id_pac>/asignar-diagnostico", methods=["POST"])
+@login_requerido
+@rol_requerido("medico")
+def medico_asignar_diagnostico(id_pac):
+    """Asigna un diagnóstico del catálogo a un paciente — sp_asignar_diagnostico."""
+    id_diagnostico = request.form.get("id_diagnostico", type=int)
+    if not id_diagnostico:
+        flash("Selecciona un diagnóstico.", "danger")
+        return redirect(url_for("doctor_paciente_perfil", id=id_pac))
+
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT set_config('medi_nfc2.id_usuario_app', %s, TRUE)",
+            [str(session["user_id"])]
+        )
+        cur.execute("BEGIN")
+        cur.execute(
+            "CALL sp_asignar_diagnostico(%s, %s, NULL, NULL, 'cur_asig_diag')",
+            [id_pac, id_diagnostico]
+        )
+        p_ok, p_msg = cur.fetchone()[:2]
+        cur.execute("FETCH ALL FROM cur_asig_diag")
+        if p_ok == 1:
+            conn.commit()
+            flash(p_msg, "success")
+        else:
+            conn.rollback()
+            flash(p_msg, "danger")
+        cur.close()
+        conn.close()
+    except Exception as e:
+        flash(str(e), "danger")
+
+    return redirect(url_for("doctor_paciente_perfil", id=id_pac))
 
 
 @app.route("/doctor/pacientes/<int:id>/grafica")
@@ -1854,7 +1904,7 @@ def doctor_receta_crear(id):
                 f"CALL sp_agregar_receta_med(NULL, NULL, NULL, '{cur_rxmed}', %s, %s, %s, %s, %s, %s, %s)",
                 [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
             )
-            _, p_ok_m, p_msg_m = cur.fetchone()
+            _, p_ok_m, p_msg_m, _ = cur.fetchone()
             conn.commit()
             if p_ok_m != 1:
                 flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
@@ -2421,7 +2471,7 @@ def doctor_receta_desde_lista():
                 f"CALL sp_agregar_receta_med(NULL, NULL, NULL, '{cur_rxm}', %s, %s, %s, %s, %s, %s, %s)",
                 [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
             )
-            p_id_rm, p_ok_m, p_msg_m = cur.fetchone()
+            p_id_rm, p_ok_m, p_msg_m, _ = cur.fetchone()
             conn.commit()
             if p_ok_m != 1:
                 flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
@@ -2434,7 +2484,7 @@ def doctor_receta_desde_lista():
                     "CALL sp_gestion_etiqueta_nfc('I', %s, NULL, NULL, 'cur_nfc', %s, %s, %s, %s)",
                     [uid.strip(), f"{nombre_med} - Paciente", 'medicamento', p_id_rm, 'activo'],
                 )
-                p_uid, p_ok, p_msg = cur.fetchone()
+                p_uid, p_ok, p_msg, _ = cur.fetchone()
                 cur.execute("FETCH ALL FROM cur_nfc")
                 conn.commit()
         cur.close(); conn.close()
@@ -2846,7 +2896,7 @@ def cuidador_escaneo(id):
                 )""",
                 [uid_nfc, id_cuidador, float(lat), float(lon), obs],
             )
-            p_id_ev, p_ok, p_msg, p_res, p_prox = cur.fetchone()
+            p_id_ev, p_ok, p_msg, p_res, p_prox, _ = cur.fetchone()
             conn.commit()
             cur.close()
             conn.close()
