@@ -173,7 +173,7 @@ def login():
             cur.close()
             conn.close()
         except Exception as e:
-            flash("Error de conexión con la base de datos.", "danger")
+            flash(f"Error: {str(e)}", "danger")
             return render_template("login.html")
 
         if login_ok:
