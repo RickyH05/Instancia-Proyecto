@@ -332,7 +332,7 @@ def admin_medicos():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_medico('L', NULL, NULL, NULL, 'cur_med_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_med_l")
         medicos = cur.fetchall()
         conn.commit()
@@ -400,7 +400,7 @@ def admin_cuidadores():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_cuidador('L', NULL, NULL, NULL, 'cur_cuid_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_cuid_l")
         cuidadores = cur.fetchall()
         conn.commit()
@@ -530,7 +530,7 @@ def admin_medicamentos():
 
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_medicamento('L', NULL, NULL, NULL, 'cur_med_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_med_l")
         medicamentos = cur.fetchall()
         conn.commit()
@@ -593,7 +593,7 @@ def admin_diagnosticos():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_diagnostico('L', NULL, NULL, NULL, 'cur_diag_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_diag_l")
         diagnosticos = cur.fetchall()
         conn.commit()
@@ -649,7 +649,7 @@ def admin_especialidades():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_especialidad('L', NULL, NULL, NULL, 'cur_esp_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_esp_l")
         especialidades = cur.fetchall()
         conn.commit()
@@ -721,7 +721,7 @@ def admin_beacon():
         conn.commit()
         cur.execute("BEGIN")
         cur.execute("CALL sp_gestion_paciente('L', NULL, NULL, NULL, 'cur_pac_l')")
-        _, p_ok, p_msg = cur.fetchone()
+        _, p_ok, p_msg, _ = cur.fetchone()
         cur.execute("FETCH ALL FROM cur_pac_l")
         pacientes = [(r[0], f"{r[1]} {r[2]} {r[3] or ''}".strip()) for r in cur.fetchall()]
         conn.commit()
@@ -1040,7 +1040,7 @@ def admin_omisiones():
         conn, cur = _admin_db()
         cur.execute("BEGIN")
         cur.execute("CALL sp_detectar_omisiones(NULL, NULL, NULL, 'cur_omisiones')")
-        p_ok, p_msg, p_total = cur.fetchone()
+        p_ok, p_msg, p_total, _ = cur.fetchone()
         conn.commit()
         cur.close(); conn.close()
         flash(
@@ -1728,6 +1728,17 @@ def doctor_paciente_perfil(id):
         vinculos = [r for r in cur.fetchall() if r[3]]  # solo activos
         conn.commit()
 
+        # ── catálogo de diagnósticos para el formulario de asignación ────────
+        diagnosticos_catalogo = []
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_gestion_diagnostico('L', NULL, NULL, NULL, 'cur_diag_cat')")
+        _, p_ok_cat, _msg, _ = cur.fetchone()
+        if p_ok_cat != 1:
+            conn.rollback()
+        cur.execute("FETCH ALL FROM cur_diag_cat")
+        diagnosticos_catalogo = cur.fetchall()
+        conn.commit()
+
         cur.close()
         conn.close()
 
@@ -1742,7 +1753,46 @@ def doctor_paciente_perfil(id):
         alertas=alertas,
         recetas=list(recetas.values()),
         vinculos=vinculos,
+        diagnosticos_catalogo=diagnosticos_catalogo,
     )
+
+
+@app.route("/medico/paciente/<int:id_pac>/asignar-diagnostico", methods=["POST"])
+@login_requerido
+@rol_requerido("medico")
+def medico_asignar_diagnostico(id_pac):
+    """Asigna un diagnóstico del catálogo a un paciente — sp_asignar_diagnostico."""
+    id_diagnostico = request.form.get("id_diagnostico", type=int)
+    if not id_diagnostico:
+        flash("Selecciona un diagnóstico.", "danger")
+        return redirect(url_for("doctor_paciente_perfil", id=id_pac))
+
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT set_config('medi_nfc2.id_usuario_app', %s, TRUE)",
+            [str(session["user_id"])]
+        )
+        cur.execute("BEGIN")
+        cur.execute(
+            "CALL sp_asignar_diagnostico(%s, %s, NULL, NULL, 'cur_asig_diag')",
+            [id_pac, id_diagnostico]
+        )
+        p_ok, p_msg = cur.fetchone()[:2]
+        cur.execute("FETCH ALL FROM cur_asig_diag")
+        if p_ok == 1:
+            conn.commit()
+            flash(p_msg, "success")
+        else:
+            conn.rollback()
+            flash(p_msg, "danger")
+        cur.close()
+        conn.close()
+    except Exception as e:
+        flash(str(e), "danger")
+
+    return redirect(url_for("doctor_paciente_perfil", id=id_pac))
 
 
 @app.route("/doctor/pacientes/<int:id>/grafica")
@@ -1854,7 +1904,7 @@ def doctor_receta_crear(id):
                 f"CALL sp_agregar_receta_med(NULL, NULL, NULL, '{cur_rxmed}', %s, %s, %s, %s, %s, %s, %s)",
                 [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
             )
-            _, p_ok_m, p_msg_m = cur.fetchone()
+            _, p_ok_m, p_msg_m, _ = cur.fetchone()
             conn.commit()
             if p_ok_m != 1:
                 flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
@@ -2421,7 +2471,7 @@ def doctor_receta_desde_lista():
                 f"CALL sp_agregar_receta_med(NULL, NULL, NULL, '{cur_rxm}', %s, %s, %s, %s, %s, %s, %s)",
                 [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
             )
-            p_id_rm, p_ok_m, p_msg_m = cur.fetchone()
+            p_id_rm, p_ok_m, p_msg_m, _ = cur.fetchone()
             conn.commit()
             if p_ok_m != 1:
                 flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
@@ -2434,7 +2484,7 @@ def doctor_receta_desde_lista():
                     "CALL sp_gestion_etiqueta_nfc('I', %s, NULL, NULL, 'cur_nfc', %s, %s, %s, %s)",
                     [uid.strip(), f"{nombre_med} - Paciente", 'medicamento', p_id_rm, 'activo'],
                 )
-                p_uid, p_ok, p_msg = cur.fetchone()
+                p_uid, p_ok, p_msg, _ = cur.fetchone()
                 cur.execute("FETCH ALL FROM cur_nfc")
                 conn.commit()
         cur.close(); conn.close()
@@ -2823,10 +2873,11 @@ def cuidador_escaneo(id):
     resultado   = None   # se rellena tras POST exitoso
 
     if request.method == "POST":
-        uid_nfc = request.form.get("uid_nfc", "").strip()
-        lat     = request.form.get("lat", "").strip()
-        lon     = request.form.get("lon", "").strip()
-        obs     = request.form.get("observaciones", "").strip() or None
+        uid_nfc   = request.form.get("uid_nfc", "").strip()
+        lat       = request.form.get("lat", "").strip()
+        lon       = request.form.get("lon", "").strip()
+        precision = request.form.get("precision", "").strip() or None
+        obs       = request.form.get("observaciones", "").strip() or None
 
         if not uid_nfc or not lat or not lon:
             flash("UID NFC, latitud y longitud son obligatorios.", "danger")
@@ -2842,11 +2893,13 @@ def cuidador_escaneo(id):
             cur.execute(
                 """CALL sp_registrar_toma_nfc(
                     NULL, NULL, NULL, NULL, NULL, 'cur_nfc',
-                    %s, %s, %s, %s, NULL, %s
+                    %s, %s::integer, %s::numeric(10,7), %s::numeric(10,7), %s::numeric(6,2), %s
                 )""",
-                [uid_nfc, id_cuidador, float(lat), float(lon), obs],
+                [uid_nfc, id_cuidador, float(lat), float(lon), float(precision) if precision else None, obs],
             )
-            p_id_ev, p_ok, p_msg, p_res, p_prox = cur.fetchone()
+            p_id_ev, p_ok, p_msg, p_res, p_prox, _ = cur.fetchone()
+            cur.execute("FETCH ALL FROM cur_nfc")
+            row_cursor = cur.fetchone()
             conn.commit()
             cur.close()
             conn.close()
@@ -2856,11 +2909,17 @@ def cuidador_escaneo(id):
             return render_template("cuidador/nfc_escaneo.html", id=id, resultado=None)
 
         if p_ok == 1:
+            # columnas: id_evento, timestamp_lectura, resultado, desfase_min,
+            #           distancia_metros, proximidad_valida, cuidador, paciente, medicamento
             resultado = {
-                "estado":    p_res,          # 'Exitoso' | 'Tardío' | 'Duplicado'
-                "proximidad": p_prox,
-                "id_evento": p_id_ev,
-                "msg":       p_msg,
+                "estado":            p_res,
+                "proximidad":        p_prox,
+                "id_evento":         p_id_ev,
+                "msg":               p_msg,
+                "desfase_min":       row_cursor[3] if row_cursor else None,
+                "distancia_metros":  row_cursor[4] if row_cursor else None,
+                "paciente":          row_cursor[7] if row_cursor else None,
+                "medicamento":       row_cursor[8] if row_cursor else None,
             }
         else:
             flash(p_msg, "danger")
@@ -2955,9 +3014,14 @@ def cuidador_alerta_atender(id_alerta):
 @login_requerido
 @rol_requerido("cuidador")
 def cuidador_historial():
-    id_cuidador = session["id_rol"]
-    eventos = []
-    stats   = {"ok": 0, "omitidas": 0, "fuera": 0}
+    from datetime import date
+    id_cuidador        = session["id_rol"]
+    eventos            = []
+    stats              = {"ok": 0, "omitidas": 0, "fuera": 0}
+    fecha_seleccionada = request.args.get("fecha") or str(date.today())
+    id_paciente_filtro = request.args.get("id_paciente", type=int)
+    total_omisiones    = 0
+    lista_pacientes    = []
     try:
         conn = get_db()
         cur  = conn.cursor()
@@ -2967,11 +3031,15 @@ def cuidador_historial():
         dashboard_rows = cur.fetchall()
         conn.commit()
         # col 1 = id_paciente, col 2 = paciente (nombre)
-        id_pacientes = list({r[1] for r in dashboard_rows})
-        pac_nombre   = {r[1]: r[2] for r in dashboard_rows}
+        id_pacientes    = list({r[1] for r in dashboard_rows})
+        pac_nombre      = {r[1]: r[2] for r in dashboard_rows}
+        lista_pacientes = [{"id": k, "nombre": v} for k, v in sorted(pac_nombre.items(), key=lambda x: x[1])]
+
+        # Si hay filtro, restringir el conjunto de pacientes a consultar
+        ids_a_consultar = [id_paciente_filtro] if id_paciente_filtro and id_paciente_filtro in id_pacientes else id_pacientes
 
         historial_rows = []
-        for id_pac in id_pacientes:
+        for id_pac in ids_a_consultar:
             cur_name = f"cur_hist_{id_pac}"
             cur.execute("BEGIN")
             cur.execute(f"CALL sp_rep_historial_tomas('{cur_name}', %s, 14)", [id_pac])
@@ -2979,22 +3047,55 @@ def cuidador_historial():
             historial_rows.extend(cur.fetchall())
             conn.commit()
         # cols: 0=id_paciente, 1=id_evento, 2=timestamp_lectura, 4=resultado,
-        #       6=origen, 9=medicamento
+        #       6=origen, 9=medicamento, 13=regla_aplicada
         for r in historial_rows:
             eventos.append({
-                "id":        r[1],
-                "pac":       pac_nombre.get(r[0], "—"),
-                "med":       r[9] or "—",
-                "resultado": r[4] or "—",
-                "time":      str(r[2])[:16],
-                "orig":      "NFC" if (r[6] or "").lower() == "nfc" else "Manual",
+                "id":             r[1],
+                "id_paciente":    r[0],
+                "pac":            pac_nombre.get(r[0], "—"),
+                "med":            r[9] or "—",
+                "resultado":      r[4] or "—",
+                "time":           str(r[2])[:16],
+                "orig":           "NFC" if (r[6] or "").lower() == "nfc" else "Manual",
+                "regla_aplicada": r[13] if len(r) > 13 else None,
             })
-        stats["ok"]    = sum(1 for e in eventos if e["resultado"] == "Exitoso")
-        stats["fuera"] = sum(1 for e in eventos if e["resultado"] == "Tardío")
+        stats["ok"]    = sum(1 for e in eventos if e["regla_aplicada"] in ("TOMA_EXITOSA", "TOMA_TARDIA", "DUPLICADO_DETECTADO"))
+        stats["fuera"] = sum(1 for e in eventos if e["regla_aplicada"] == "SIN_AGENDA_ASOCIABLE")
+
+        # Contar omisiones del día desde sp_rep_agenda_dia_cuidador
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_agenda_dia_cuidador('cur_agenda', %s, %s)",
+                    [id_cuidador, fecha_seleccionada])
+        cur.execute("FETCH ALL FROM cur_agenda")
+        agendas = cur.fetchall()
+        conn.commit()
+        # col 3 = estado_agenda, col 5 = id_paciente
+        total_omisiones = sum(1 for a in agendas if a[3] == "omitida" and a[5] in ids_a_consultar)
+
+        # Agregar filas de omisiones a la tabla (respetando filtro de paciente)
+        for a in agendas:
+            if a[3] == "omitida" and a[5] in ids_a_consultar:
+                eventos.append({
+                    "id":             None,
+                    "id_paciente":    a[5],
+                    "pac":            a[6] or "—",
+                    "med":            a[7] or "—",
+                    "resultado":      "Omitido",
+                    "time":           str(a[2])[:16],
+                    "orig":           "—",
+                    "regla_aplicada": "OMITIDA",
+                })
+
+        eventos.sort(key=lambda e: e["time"], reverse=True)
+
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar historial: {e}", "danger")
-    return render_template("cuidador/historial_nfc.html", eventos=eventos, stats=stats)
+    return render_template("cuidador/historial_nfc.html",
+                           eventos=eventos, stats=stats, omisiones=total_omisiones,
+                           fecha_seleccionada=fecha_seleccionada,
+                           lista_pacientes=lista_pacientes,
+                           id_paciente_filtro=id_paciente_filtro)
 
 
 @app.route("/cuidador/paciente/<int:id>/beacon")

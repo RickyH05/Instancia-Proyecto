@@ -17,10 +17,34 @@
       <h2 style="font-size:20px;font-weight:700;margin-bottom:12px;">Dosis registrada correctamente</h2>
       <div class="card" style="max-width:320px;margin:0 auto 24px;text-align:left;box-shadow:none;border:1px solid #E8ECF0;">
         <div class="card-body" style="padding:14px;">
+          {% if resultado.medicamento %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Medicamento</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.medicamento }}</span>
+          </div>
+          {% endif %}
+          {% if resultado.paciente %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Paciente</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.paciente }}</span>
+          </div>
+          {% endif %}
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
             <span style="color:#5D6D7E;">Proximidad</span>
             <span style="font-weight:500;color:#1ABC9C;">{{ '✅ Válida' if resultado.proximidad else '⚠️ Fuera de rango' }}</span>
           </div>
+          {% if resultado.desfase_min is not none %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Desfase</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.desfase_min }} min</span>
+          </div>
+          {% endif %}
+          {% if resultado.distancia_metros is not none %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Distancia al beacon</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.distancia_metros }} m</span>
+          </div>
+          {% endif %}
           <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;">
             <span style="color:#5D6D7E;">Evento #</span>
             <span style="font-weight:500;color:#2C3E50;">{{ resultado.id_evento }}</span>
@@ -38,8 +62,49 @@
         <i data-lucide="alert-triangle" style="width:52px;height:52px;color:#F39C12;"></i>
       </div>
       <h2 style="font-size:20px;font-weight:700;margin-bottom:8px;">Dosis fuera de horario</h2>
-      <p style="font-size:14px;color:#5D6D7E;margin-bottom:20px;">La toma fue registrada fuera de la ventana de tolerancia.</p>
-      <a href="{{ url_for('cuidador_paciente', id=id) }}" class="btn btn-ghost" style="min-width:180px;">Volver al paciente</a>
+      <p style="font-size:14px;color:#5D6D7E;margin-bottom:16px;">La toma fue registrada pero fuera de la ventana de tolerancia.</p>
+      <div class="card" style="max-width:320px;margin:0 auto 24px;text-align:left;box-shadow:none;border:1px solid #E8ECF0;">
+        <div class="card-body" style="padding:14px;">
+          {% if resultado.medicamento %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Medicamento</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.medicamento }}</span>
+          </div>
+          {% endif %}
+          {% if resultado.paciente %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Paciente</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.paciente }}</span>
+          </div>
+          {% endif %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Proximidad</span>
+            <span style="font-weight:500;color:{{ '#1ABC9C' if resultado.proximidad else '#E74C3C' }};">{{ '✅ Válida' if resultado.proximidad else '⚠️ Fuera de rango' }}</span>
+          </div>
+          {% if resultado.desfase_min is not none %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Desfase</span>
+            <span style="font-weight:500;color:#F39C12;">{{ resultado.desfase_min }} min</span>
+          </div>
+          {% endif %}
+          {% if resultado.distancia_metros is not none %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Distancia al beacon</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.distancia_metros }} m</span>
+          </div>
+          {% endif %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;">
+            <span style="color:#5D6D7E;">Evento #</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.id_evento }}</span>
+          </div>
+        </div>
+      </div>
+      {% if not resultado.proximidad %}
+      <div style="background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.2);border-radius:8px;padding:12px;max-width:320px;margin:0 auto 20px;font-size:13px;color:#c0392b;">
+        ⚠️ El escaneo se realizó fuera del área autorizada del beacon.
+      </div>
+      {% endif %}
+      <a href="{{ url_for('cuidador_paciente', id=id) }}" class="btn btn-ghost" style="border-color:#F39C12;color:#F39C12;min-width:180px;">Volver al paciente</a>
     </div>
   </div>
 
@@ -50,11 +115,70 @@
         <i data-lucide="x-octagon" style="width:52px;height:52px;color:#E74C3C;"></i>
       </div>
       <h2 style="font-size:20px;font-weight:700;color:#E74C3C;margin-bottom:8px;">Dosis duplicada detectada</h2>
-      <p style="font-size:14px;color:#5D6D7E;margin-bottom:16px;">Este medicamento ya fue registrado previamente en este horario.</p>
+      <p style="font-size:14px;color:#5D6D7E;margin-bottom:16px;">Esta toma ya fue registrada recientemente en el mismo horario.</p>
+      <div class="card" style="max-width:320px;margin:0 auto 24px;text-align:left;box-shadow:none;border:1px solid #E8ECF0;">
+        <div class="card-body" style="padding:14px;">
+          {% if resultado.medicamento %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Medicamento</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.medicamento }}</span>
+          </div>
+          {% endif %}
+          {% if resultado.paciente %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Paciente</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.paciente }}</span>
+          </div>
+          {% endif %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Proximidad</span>
+            <span style="font-weight:500;color:{{ '#1ABC9C' if resultado.proximidad else '#E74C3C' }};">{{ '✅ Válida' if resultado.proximidad else '⚠️ Fuera de rango' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;">
+            <span style="color:#5D6D7E;">Evento #</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.id_evento }}</span>
+          </div>
+        </div>
+      </div>
       <div style="background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.2);border-radius:8px;padding:14px;max-width:320px;margin:0 auto 24px;font-size:13px;color:#c0392b;">
         ⚠️ Tomar una dosis duplicada puede ser peligroso. Contacta al médico si tienes dudas.
       </div>
       <a href="{{ url_for('cuidador_paciente', id=id) }}" class="btn btn-ghost" style="border-color:#E74C3C;color:#E74C3C;min-width:180px;">Cancelar</a>
+    </div>
+  </div>
+  {% elif resultado.estado == 'Sin agenda' %}
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:40px 24px;">
+      <div style="width:88px;height:88px;border-radius:50%;background:rgba(243,156,18,.10);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <i data-lucide="alert-triangle" style="width:52px;height:52px;color:#F39C12;"></i>
+      </div>
+      <h2 style="font-size:20px;font-weight:700;color:#F39C12;margin-bottom:8px;">Toma fuera de horario programado</h2>
+      <p style="font-size:14px;color:#5D6D7E;margin-bottom:16px;">No se encontró una toma programada para este momento. La toma fue registrada pero no está asociada a ningún horario.</p>
+      <div class="card" style="max-width:320px;margin:0 auto 24px;text-align:left;box-shadow:none;border:1px solid #E8ECF0;">
+        <div class="card-body" style="padding:14px;">
+          {% if resultado.medicamento %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Medicamento</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.medicamento }}</span>
+          </div>
+          {% endif %}
+          {% if resultado.paciente %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Paciente</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.paciente }}</span>
+          </div>
+          {% endif %}
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F4F6F8;font-size:13px;">
+            <span style="color:#5D6D7E;">Proximidad</span>
+            <span style="font-weight:500;color:{{ '#1ABC9C' if resultado.proximidad else '#E74C3C' }};">{{ '✅ Válida' if resultado.proximidad else '⚠️ Fuera de rango' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;">
+            <span style="color:#5D6D7E;">Evento #</span>
+            <span style="font-weight:500;color:#2C3E50;">{{ resultado.id_evento }}</span>
+          </div>
+        </div>
+      </div>
+      <a href="{{ url_for('cuidador_paciente', id=id) }}" class="btn btn-ghost" style="border-color:#F39C12;color:#F39C12;min-width:180px;">Volver al paciente</a>
     </div>
   </div>
   {% endif %}

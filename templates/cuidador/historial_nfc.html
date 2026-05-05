@@ -3,8 +3,19 @@
 {% block page_title %}Historial NFC{% endblock %}
 {% block content %}
 
-<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-  <input type="date" class="form-control" style="max-width:180px;"/>
+<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+  <input type="date" id="inp-fecha" class="form-control" style="max-width:180px;"
+    value="{{ fecha_seleccionada }}"
+    onchange="aplicarFiltros()"/>
+  <select id="sel-paciente" class="form-control" style="max-width:220px;"
+    onchange="aplicarFiltros()">
+    <option value="">Todos los pacientes</option>
+    {% for p in lista_pacientes %}
+    <option value="{{ p.id }}" {% if id_paciente_filtro == p.id %}selected{% endif %}>
+      {{ p.nombre }}
+    </option>
+    {% endfor %}
+  </select>
 </div>
 
 <!-- Resumen -->
@@ -13,7 +24,7 @@
     <div><div class="stat-label">Tomadas ✅</div><div class="stat-value" style="color:#1ABC9C;font-size:26px;">{{ stats.ok }}</div></div>
   </div>
   <div class="stat-card" style="padding:14px;">
-    <div><div class="stat-label">Omisiones ❌</div><div class="stat-value" style="color:#E74C3C;font-size:26px;">{{ stats.omitidas }}</div></div>
+    <div><div class="stat-label">Omisiones ❌</div><div class="stat-value" style="color:#E74C3C;font-size:26px;">{{ omisiones }}</div></div>
   </div>
   <div class="stat-card" style="padding:14px;">
     <div><div class="stat-label">Fuera horario ⚠️</div><div class="stat-value" style="color:#F39C12;font-size:26px;">{{ stats.fuera }}</div></div>
@@ -34,18 +45,29 @@
           <td style="font-size:13px;color:#2C3E50;font-weight:500;">{{ ev.pac }}</td>
           <td style="font-size:13px;color:#5D6D7E;">{{ ev.med }}</td>
           <td>
-            <span class="badge {% if ev.resultado=='Exitoso' %}badge-green{% elif ev.resultado=='Tardío' %}badge-yellow{% else %}badge-red{% endif %}">
-              {{ ev.resultado }}
-            </span>
+            {% if ev.resultado == 'Omitido' %}
+              <span class="badge badge-red">Omitido</span>
+            {% elif ev.regla_aplicada == 'SIN_AGENDA_ASOCIABLE' %}
+              <span class="badge badge-yellow">Sin agenda</span>
+            {% elif ev.resultado == 'Tardío' %}
+              <span class="badge badge-yellow">Tardío</span>
+            {% elif ev.resultado == 'Duplicado' %}
+              <span class="badge badge-red">Duplicado</span>
+            {% else %}
+              <span class="badge badge-green">Exitoso</span>
+            {% endif %}
           </td>
           <td style="font-size:12px;color:#5D6D7E;">
-            {% if ev.orig=='NFC' %}
+            {% if ev.orig == 'NFC' %}
               <i data-lucide="radio" style="width:12px;height:12px;display:inline;vertical-align:middle;"></i> NFC
+            {% elif ev.orig == '—' %}
+              —
             {% else %}
               <i data-lucide="pen-line" style="width:12px;height:12px;display:inline;vertical-align:middle;"></i> Manual
             {% endif %}
           </td>
           <td style="text-align:right;white-space:nowrap;">
+            {% if ev.resultado != 'Omitido' %}
             <button class="btn btn-ghost btn-icon btn-sm" title="Ver detalle"
               onclick="verEvento('{{ ev.pac|e }}','{{ ev.med|e }}','{{ ev.resultado|e }}','{{ ev.time }}','{{ ev.orig }}')">
               <i data-lucide="eye" style="width:14px;height:14px;color:#5D6D7E;"></i>
@@ -54,6 +76,7 @@
               onclick="editEvento('{{ ev.id }}','{{ ev.pac|e }}','{{ ev.med|e }}')">
               <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
             </button>
+            {% endif %}
           </td>
         </tr>
         {% else %}
@@ -132,6 +155,14 @@
 {% endblock %}
 {% block scripts %}<script>
 lucide.createIcons();
+function aplicarFiltros() {
+  var fecha = document.getElementById('inp-fecha').value;
+  var pac   = document.getElementById('sel-paciente').value;
+  var url   = window.location.pathname + '?';
+  if (fecha) url += 'fecha=' + fecha + '&';
+  if (pac)   url += 'id_paciente=' + pac;
+  window.location.href = url;
+}
 function verEvento(pac,med,res,time,orig){
   document.getElementById('ver-pac').textContent=pac;
   document.getElementById('ver-med').textContent=med;
