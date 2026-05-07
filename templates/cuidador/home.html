@@ -63,6 +63,17 @@
   </div>
 </div>
 
+<a href="{{ url_for('cuidador_nfc_nuevo') }}" class="stat-card" style="text-decoration:none;margin-bottom:20px;display:flex;">
+  <div>
+    <div class="stat-label">Pastillero NFC</div>
+    <div style="font-size:14px;font-weight:600;color:#1B4F72;margin-top:4px;">Vincular nuevo →</div>
+    <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">Asigna una etiqueta NFC a un medicamento</div>
+  </div>
+  <div class="stat-icon" style="background:rgba(26,188,156,.12);margin-left:auto;">
+    <i data-lucide="wifi" style="width:22px;height:22px;color:#1ABC9C;transform:rotate(90deg);"></i>
+  </div>
+</a>
+
 <h2 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin-bottom:14px;">Mis Pacientes</h2>
 {% if pacientes %}
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">

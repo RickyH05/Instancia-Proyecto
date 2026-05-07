@@ -3,19 +3,23 @@
 ## Stack
 - Python Flask (sin Blueprints, todo en `app.py`)
 - **psycopg (versión 3)** — `import psycopg` (NO `psycopg2`, NO SQLAlchemy, NO ORM)
-- Base de datos: `medi_nfc2` | usuario: `proyectofinal_user` | contraseña: `444`
-- Conexión: `postgresql://proyectofinal_user:444@localhost:5432/medi_nfc2`
+- **pymongo** — `from pymongo import MongoClient` para MongoDB
+- Base de datos principal: `medi_nfc2` (PostgreSQL)
+- Base de datos secundaria: `medinfc_mongo` (MongoDB)
+- Conexión PG: `postgresql://proyectofinal_user:444@localhost:5432/medi_nfc2`
+- Conexión Mongo: `mongodb://localhost:27017/`
 - Ver `@docs/database.md` para firmas completas de SPs
 
 ## Estructura
 - `app.py` (una sola app, sin blueprints)
+- `mongo_client.py` (funciones de lectura/escritura MongoDB)
 - `/templates` con Jinja2
 - `/static` para CSS, JS e imágenes
-- `.env` con `SECRET_KEY`, `DB_*`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`
+- `.env` con `SECRET_KEY`, `DB_*`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, `MONGO_URI`, `MONGO_DB`
 
 ---
 
-## Regla #1 — NUNCA queries directos. SIEMPRE Stored Procedures.
+## Regla #1 — NUNCA queries directos a PostgreSQL. SIEMPRE Stored Procedures.
 
 **Flask no escribe SQL propio. Ni SELECT, ni INSERT, ni UPDATE, ni DELETE.**
 Para todo — lecturas, escrituras, reportes, contadores — se usa un SP.
@@ -29,23 +33,18 @@ Para todo — lecturas, escrituras, reportes, contadores — se usa un SP.
 ❌ INCORRECTO: cur.execute("UPDATE paciente SET ...")
 ```
 
-Las Views y las tablas existen en la BD como capa interna — Flask nunca las toca directamente.
-
 **Excepciones explícitas (y únicas):**
-1. **Login** — bcrypt debe verificarse en Python, no en BD; se hace SELECT de contraseña.
+1. **Login** — bcrypt debe verificarse en Python; se hace SELECT directo.
 2. **Cambio de cuidador principal** — el UPDATE de `activo=FALSE` en `paciente_cuidador` no tiene SP propio.
 
 ---
 
 ## Regla #2 — Patrón obligatorio para todos los SPs
 
-Todos los SPs tienen `INOUT io_cursor REFCURSOR`. Siempre `BEGIN` + `CALL` + `FETCH ALL` + `COMMIT`.
-
 ```python
 try:
     cur.execute("BEGIN")
     cur.execute("CALL sp_nombre('cur_unico', %s, %s)", [param1, param2])
-    # Si el SP tiene OUT escalares (p_ok, p_msg, etc.) leerlos ANTES del FETCH:
     p_ok, p_msg = cur.fetchone()[:2]
     cur.execute("FETCH ALL FROM cur_unico")
     rows = cur.fetchall()
@@ -60,9 +59,6 @@ except Exception as e:
     flash(str(e), 'error')
 ```
 
-**Nombre del cursor:** único por llamada dentro de la misma conexión.
-Usar `f"cur_{nombre_sp}_{id_o_timestamp}"` para evitar colisiones.
-
 ---
 
 ## Posición de `io_cursor` según tipo de SP
@@ -71,10 +67,6 @@ Usar `f"cur_{nombre_sp}_{id_o_timestamp}"` para evitar colisiones.
 |------|------------------------|---------|
 | **CRUD / Operativos** | Después de `OUT` escalares, antes de `IN DEFAULT` | `CALL sp_gestion_paciente('I', NULL, NULL, NULL, 'cur1', %s, ...)` |
 | **Reportes `sp_rep_*`** | **Primer parámetro** | `CALL sp_rep_pacientes_medico('cur1', %s)` |
-
-Los `sp_rep_*` tienen `io_cursor` primero porque todos sus demás parámetros
-son opcionales con `DEFAULT` y PostgreSQL no permite parámetros sin DEFAULT
-después de uno con DEFAULT.
 
 ---
 
@@ -99,7 +91,6 @@ después de uno con DEFAULT.
 - Login admin: `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH` en `.env`
 
 ```python
-# Login — ÚNICA excepción válida para SELECT directo
 cur.execute("""
     SELECT u.id_usuario, u.password_hash, u.rol_usuario,
            COALESCE(u.id_medico, u.id_cuidador) AS id_rol,
@@ -125,7 +116,7 @@ if row and bcrypt.checkpw(password.encode(), row[1].encode()):
 ```python
 session['user_id'] = id_usuario
 session['rol']     = 'medico' | 'cuidador' | 'admin'
-session['id_rol']  = id_medico | id_cuidador | None   # None para admin
+session['id_rol']  = id_medico | id_cuidador | None
 session['nombre']  = 'Nombre Completo'
 ```
 
@@ -134,8 +125,8 @@ session['nombre']  = 'Nombre Completo'
 ## Protección de rutas
 
 ```python
-@login_requerido          # revisa session['user_id']
-@rol_requerido('medico')  # revisa session['rol']
+@login_requerido
+@rol_requerido('medico')
 def mi_ruta():
     ...
 ```
@@ -144,7 +135,7 @@ def mi_ruta():
 
 ## Auditoría
 
-Antes de cualquier SP que modifica tablas maestras (`paciente`, `medico`, `cuidador`, `usuario`):
+Antes de cualquier SP que modifica tablas maestras:
 
 ```python
 cur.execute("SELECT set_config('medi_nfc2.id_usuario_app', %s, TRUE)",
@@ -153,113 +144,174 @@ cur.execute("SELECT set_config('medi_nfc2.id_usuario_app', %s, TRUE)",
 
 ---
 
-## Casos especiales
+## ══════════════════════════════════════════
+## INTEGRACIÓN MONGODB
+## ══════════════════════════════════════════
 
-### Badge de alertas pendientes
+### Conexión MongoDB
+
 ```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_badge_alertas('cur_badge', %s, %s)",
-            [session['user_id'], session['rol']])
-cur.execute("FETCH ALL FROM cur_badge")
-row   = cur.fetchone()
-total = row[0] if row else 0
-conn.commit()
+# mongo_client.py
+from pymongo import MongoClient
+from datetime import datetime, timedelta, timezone
+import os
+
+_mongo_client = None
+
+def get_mongo_db():
+    global _mongo_client
+    if _mongo_client is None:
+        _mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017/"))
+    return _mongo_client[os.getenv("MONGO_DB", "medinfc_mongo")]
 ```
 
-### Cambio de cuidador principal (única excepción #2)
-```python
-# UPDATE directo — no hay SP para desactivar la relación anterior
-cur.execute("""
-    UPDATE paciente_cuidador SET activo = FALSE
-    WHERE  id_paciente = %s AND es_principal = TRUE AND activo = TRUE
-""", [id_paciente])
-# Luego asignar el nuevo con SP
-cur.execute("BEGIN")
-cur.execute("CALL sp_asignar_cuidador(%s, %s, NULL, NULL, 'cur1', TRUE)",
-            [id_paciente, id_cuidador_nuevo])
-p_ok, p_msg = cur.fetchone()[:2]
-conn.commit()
+### Variables .env necesarias
+
+```
+MONGO_URI=mongodb://localhost:27017/
+MONGO_DB=medinfc_mongo
 ```
 
-### Gestión de horarios
-Requiere `id_paciente_cuidador` (PK de `paciente_cuidador`), no `id_cuidador`:
-```python
-# Obtener el id del vínculo
-cur.execute("""
-    SELECT id_paciente_cuidador FROM paciente_cuidador
-    WHERE  id_paciente = %s AND id_cuidador = %s AND activo = TRUE
-""", [id_paciente, id_cuidador])
-id_pc = cur.fetchone()[0]
+### Colecciones disponibles en medinfc_mongo
 
-# Usar el SP
-cur.execute("BEGIN")
-cur.execute("CALL sp_gestion_horario('I', NULL, NULL, NULL, 'cur1', %s, %s, %s, %s)",
-            [id_pc, 'lunes', '08:00:00', '14:00:00'])
-p_id, p_ok, p_msg = cur.fetchone()[:3]
-conn.commit()
+| Colección | Categoría | Propósito |
+|-----------|-----------|-----------|
+| `perfil_clinico_paciente` | Datos semi-estructurados | Notas clínicas, alergias, preferencias variables por paciente |
+| `logs_acceso` | Logs | Intentos de login (exitosos y fallidos) TTL 90d |
+| `logs_sistema` | Logs | Errores Flask, sincronizaciones, scheduler TTL 30d |
+| `eventos_nfc_rt` | Eventos tiempo real | Tomas NFC desnormalizadas para lectura rápida TTL 30d |
+| `alertas_rt` | Eventos tiempo real | Alertas activas para badge del menú TTL 60d |
+| `historico_adherencia` | Históricos masivos | Métricas diarias por paciente — **FUENTE DE LAS 3 GRÁFICAS** |
+| `ubicaciones_gps_hist` | Históricos masivos | Trayecto GPS completo (PG solo guarda el último punto) TTL 6m |
+
+### IDs compartidos PostgreSQL ↔ MongoDB
+
+| Campo MongoDB | Tabla PostgreSQL | Columna |
+|---------------|-----------------|---------|
+| `pg_id_paciente` | `paciente` | `id_paciente` |
+| `pg_id_medico` | `medico` | `id_medico` |
+| `pg_id_cuidador` | `cuidador` | `id_cuidador` |
+| `pg_id_evento` | `evento_nfc` | `id_evento` |
+| `pg_id_alerta` | `alerta` | `id_alerta` |
+| `pg_id_usuario` | `usuario` | `id_usuario` |
+
+### Flujo de datos
+
+**PostgreSQL → MongoDB (escritura):**
+PostgreSQL es siempre la fuente de verdad. Después de un SP exitoso, Flask llama funciones de `mongo_client.py` para sincronizar.
+
+**MongoDB → Flask (lectura):**
+Las 3 gráficas Highcharts y el badge de alertas leen directo de MongoDB sin llamar SPs.
+
+```
+Evento NFC registrado en PG (sp_registrar_toma_nfc)
+        ↓
+sync_evento_nfc(datos)  →  MongoDB eventos_nfc_rt
+        ↓
+Dashboard médico lee eventos_nfc_rt.find()  →  sin tocar PG
 ```
 
-### Proceso batch de omisiones (cron)
+### Las 3 gráficas Highcharts desde MongoDB
+
+**GRÁFICA 1 — Barras comparativas** (`doctor/dashboard.html`)
 ```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_detectar_omisiones(NULL, NULL, NULL, 'cur_om')")
-p_ok, p_msg, p_total = cur.fetchone()[:3]
-cur.execute("FETCH ALL FROM cur_om")
-omisiones = cur.fetchall()
-conn.commit()
+# mongo_client.py
+def get_adherencia_por_medico(pg_id_medico, dias=14):
+    db = get_mongo_db()
+    desde = datetime.now(timezone.utc) - timedelta(days=dias)
+    return list(db.historico_adherencia.aggregate([
+        {"$match": {"pg_id_medico": pg_id_medico, "fecha": {"$gte": desde}}},
+        {"$group": {
+            "_id": "$pg_id_paciente",
+            "nombre": {"$first": "$nombre_paciente"},
+            "pct":    {"$avg":  "$metricas.pct_adherencia"}
+        }},
+        {"$sort": {"pct": -1}}
+    ]))
+```
+
+**GRÁFICA 2 — Series de tiempo** (`cuidador/grafica_adherencia.html`)
+```python
+def get_historial_paciente(pg_id_paciente, dias=14):
+    db = get_mongo_db()
+    desde = datetime.now(timezone.utc) - timedelta(days=dias)
+    return list(db.historico_adherencia.find(
+        {"pg_id_paciente": pg_id_paciente, "fecha": {"$gte": desde}},
+        {"_id": 0, "fecha": 1, "metricas": 1}
+    ).sort("fecha", 1))
+```
+
+**GRÁFICA 3 — Solid gauge / indicador** (`doctor/paciente_perfil.html`)
+```python
+def get_pct_promedio_paciente(pg_id_paciente, dias=14):
+    db = get_mongo_db()
+    desde = datetime.now(timezone.utc) - timedelta(days=dias)
+    resultado = list(db.historico_adherencia.aggregate([
+        {"$match": {"pg_id_paciente": pg_id_paciente, "fecha": {"$gte": desde}}},
+        {"$group": {"_id": None, "pct": {"$avg": "$metricas.pct_adherencia"}}}
+    ]))
+    return round(resultado[0]["pct"], 1) if resultado else 0.0
+```
+
+### Rutas Flask que usan MongoDB
+
+| Ruta | Antes (SP PostgreSQL) | Después (MongoDB) |
+|------|----------------------|-------------------|
+| `GET /doctor/dashboard` | `sp_rep_adherencia_pacientes_medico` | `get_adherencia_por_medico()` |
+| `GET /doctor/pacientes/<id>/perfil` | `sp_rep_adherencia_pacientes_medico` | `get_pct_promedio_paciente()` |
+| `GET /cuidador/grafica` | `sp_rep_grafica_tomas` | `get_historial_paciente()` |
+| `GET /api/badge_alertas` | `sp_rep_badge_alertas` | `alertas_rt.count_documents()` |
+| `POST /login` (log) | INSERT directo log_acceso | `registrar_log_acceso()` |
+
+### Datos reales en medinfc_mongo
+
+```
+Paciente 1 — Elena Martinez    pg_id_medico: 1  pct_base: 82.5%
+Paciente 2 — Hector Gonzalez   pg_id_medico: 1  pct_base: 55.5%
+Paciente 3 — Consuelo Vazquez  pg_id_medico: 1  pct_base: 91.5%
+Paciente 4 — Santiago Perez    sin receta activa, sin historial
+```
+
+### Importar mongo_client en app.py
+
+```python
+from mongo_client import (
+    get_adherencia_por_medico,
+    get_historial_paciente,
+    get_pct_promedio_paciente,
+    registrar_log_acceso,
+    registrar_log_sistema
+)
 ```
 
 ---
 
-## Tabla rápida — SP por pantalla
-
-### Acciones (CRUD / Operativos)
-
-| Pantalla / Acción | SP |
-|---|---|
-| Alta / edición paciente | `sp_gestion_paciente('I'/'U'/'D', ...)` |
-| Alta / edición médico | `sp_gestion_medico('I'/'U'/'D', ...)` |
-| Alta / edición cuidador | `sp_gestion_cuidador('I'/'U'/'D', ...)` |
-| Alta / edición medicamento | `sp_gestion_medicamento('I'/'U'/'D', ...)` |
-| Alta diagnóstico / especialidad | `sp_gestion_diagnostico` / `sp_gestion_especialidad` |
-| Alta beacon / GPS | `sp_gestion_beacon` / `sp_gestion_gps` |
-| Gestionar turno cuidador | `sp_gestion_horario('I'/'D'/'L', ...)` |
-| Crear usuario acceso | `sp_crear_usuario_admin(...)` |
-| Asignar diagnóstico | `sp_asignar_diagnostico(...)` |
-| Asignar cuidador | `sp_asignar_cuidador(...)` |
-| Cambiar cuidador principal | UPDATE directo + `sp_asignar_cuidador(...)` |
-| Asignar especialidad | `sp_asignar_especialidad(...)` |
-| Nueva receta | `sp_crear_receta(...)` |
-| Agregar medicamento a receta | `sp_agregar_receta_med(...)` |
-| Cancelar receta / actualizar dosis | `sp_cancelar_receta(...)` |
-| Escaneo NFC | `sp_registrar_toma_nfc(...)` |
-| Atender alerta | `sp_marcar_alerta_atendida(...)` |
-| Detectar omisiones (cron) | `sp_detectar_omisiones(...)` |
+## Tabla rápida — SP por pantalla (PostgreSQL)
 
 ### Lectura / Reportes (sp_rep_*)
 
 | Pantalla | SP |
 |---|---|
-| Dashboard cuidador (agenda del día) | `sp_rep_dashboard_cuidador('cur', id_cuid)` |
-| Lista de tomas del día + NFC | `sp_rep_agenda_dia_cuidador('cur', id_cuid)` |
-| Alertas del cuidador | `sp_rep_alertas_cuidador('cur', id_cuid)` |
-| Alertas del médico | `sp_rep_alertas_medico('cur', id_med)` |
-| Badge contador alertas menú | `sp_rep_badge_alertas('cur', user_id, rol)` |
-| Lista pacientes del médico | `sp_rep_pacientes_medico('cur', id_med)` |
-| Perfil completo del paciente | `sp_rep_perfil_paciente('cur', id_pac)` |
+| Dashboard cuidador | `sp_rep_dashboard_cuidador('cur', id_cuid)` |
+| Agenda día cuidador | `sp_rep_agenda_dia_cuidador('cur', id_cuid)` |
+| Alertas cuidador | `sp_rep_alertas_cuidador('cur', id_cuid)` |
+| Alertas médico | `sp_rep_alertas_medico('cur', id_med)` |
+| Badge alertas | `sp_rep_badge_alertas('cur', user_id, rol)` |
+| Lista pacientes médico | `sp_rep_pacientes_medico('cur', id_med)` |
+| Perfil paciente | `sp_rep_perfil_paciente('cur', id_pac)` |
 | Recetas y medicamentos | `sp_rep_recetas_paciente('cur', id_pac, 'vigente')` |
-| Historial de tomas NFC | `sp_rep_historial_tomas('cur', id_pac, dias)` |
-| Adherencia pacientes del médico | `sp_rep_adherencia_pacientes_medico('cur', id_med, dias)` |
-| Gráfica de barras adherencia | `sp_rep_grafica_tomas('cur', id_pac, dias)` |
+| Historial tomas NFC | `sp_rep_historial_tomas('cur', id_pac, dias)` |
+| Adherencia pacientes médico | `sp_rep_adherencia_pacientes_medico('cur', id_med, dias)` |
+| Gráfica barras adherencia | `sp_rep_grafica_tomas('cur', id_pac, dias)` |
 | Mapa GPS/Beacon | `sp_rep_mapa_medico('cur', id_med)` |
 | Adherencia global médicos | `sp_rep_adherencia_medicos('cur', dias)` |
 | Adherencia global cuidadores | `sp_rep_adherencia_cuidadores('cur', dias)` |
-| Bitácora reglas de negocio | `sp_rep_bitacora('cur', dias, limite)` |
-| Auditoría de cambios | `sp_rep_auditoria('cur', tabla, limite)` |
-| Log de accesos | `sp_rep_log_acceso('cur')` |
-| Carga de médicos | `sp_rep_carga_medicos('cur')` |
+| Bitácora reglas negocio | `sp_rep_bitacora('cur', dias, limite)` |
+| Auditoría cambios | `sp_rep_auditoria('cur', tabla, limite)` |
+| Log accesos | `sp_rep_log_acceso('cur')` |
+| Carga médicos | `sp_rep_carga_medicos('cur')` |
 | Supervisión médico-paciente | `sp_rep_supervision('cur')` |
 | Dispositivos IoT | `sp_rep_dispositivos_iot('cur')` |
-| Tendencia adherencia (7d móvil) | `sp_rep_tendencia_adherencia('cur', id_pac, dias)` |
-| Riesgo omisión consecutiva | `sp_rep_riesgo_omision('cur', id_pac)` |
-| Ranking mejora adherencia | `sp_rep_ranking_mejora('cur', rol)` |
+| Tendencia adherencia 7d | `sp_rep_tendencia_adherencia('cur', id_pac, dias)` |
+| Riesgo omisión | `sp_rep_riesgo_omision('cur', id_pac)` |
+| Ranking mejora | `sp_rep_ranking_mejora('cur', rol)` |

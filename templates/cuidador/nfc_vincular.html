@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Vincular pastillero NFC{% endblock %}
+{% block page_title %}Vincular pastillero NFC{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('cuidador_home') }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Cancelar
+</a>
+
+{# ── Tarjeta informativa del UID detectado ──────────────────────────────── #}
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-body" style="display:flex;align-items:center;gap:16px;padding:18px 20px;">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(26,188,156,.12);
+         display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <i data-lucide="wifi" style="width:24px;height:24px;color:#1ABC9C;transform:rotate(90deg);"></i>
+    </div>
+    <div>
+      <p style="font-size:12px;color:#5D6D7E;margin:0 0 2px;">Etiqueta NFC detectada</p>
+      <p style="font-size:16px;font-weight:700;color:#2C3E50;font-family:monospace;margin:0;">{{ uid }}</p>
+    </div>
+  </div>
+</div>
+
+{% if medicamentos %}
+{# ── Formulario de vinculación ──────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-header"><h3>Selecciona el medicamento a vincular</h3></div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('cuidador_nfc_vincular_post') }}">
+      <input type="hidden" name="uid_nfc" value="{{ uid }}">
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+        {% for med in medicamentos %}
+        <label style="display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:10px;
+               border:2px solid #E8ECF0;cursor:pointer;transition:border-color .2s;"
+               onclick="this.style.borderColor='#1ABC9C'">
+          <input type="radio" name="id_receta_medicamento" value="{{ med[0] }}"
+            style="margin-top:3px;accent-color:#1ABC9C;" required>
+          <div>
+            <p style="font-size:14px;font-weight:600;color:#2C3E50;margin:0 0 2px;">{{ med[1] }}</p>
+            <p style="font-size:12px;color:#5D6D7E;margin:0;">
+              {{ med[2] }} {{ med[3] }} · cada {{ med[4] }}h
+              {% if med[5] %} · hasta {{ med[5] | string | truncate(10, True, '') }}{% endif %}
+            </p>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <a href="{{ url_for('cuidador_home') }}" class="btn btn-ghost">Cancelar</a>
+        <button type="submit" class="btn btn-accent" style="flex:1;">
+          <i data-lucide="link" style="width:16px;height:16px;"></i> Vincular pastillero
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% else %}
+{# ── Sin medicamentos disponibles ─────────────────────────────────────── #}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:40px 24px;">
+    <div style="width:72px;height:72px;border-radius:50%;background:rgba(93,109,126,.08);
+         display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+      <i data-lucide="check-circle-2" style="width:36px;height:36px;color:#1ABC9C;"></i>
+    </div>
+    <h3 style="font-size:17px;font-weight:600;margin-bottom:8px;">Todo vinculado</h3>
+    <p style="font-size:14px;color:#5D6D7E;margin-bottom:20px;">
+      Todos los medicamentos ya tienen una etiqueta NFC asignada.
+    </p>
+    <a href="{{ url_for('cuidador_home') }}" class="btn btn-accent" style="min-width:160px;">Volver al inicio</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}<script>
+lucide.createIcons();
+</script>{% endblock %}

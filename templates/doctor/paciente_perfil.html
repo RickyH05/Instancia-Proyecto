@@ -237,7 +237,25 @@
 
   <!-- ── TAB: Alertas ── -->
   <div id="tab-alertas" style="padding:20px;display:none;">
-    <h3 style="font-size:15px;font-weight:600;color:#2C3E50;margin-bottom:16px;">Alertas del paciente</h3>
+
+    <!-- Filtro Pendientes / Todas -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <h3 style="font-size:15px;font-weight:600;color:#2C3E50;">Alertas del paciente</h3>
+      <div style="display:flex;gap:6px;">
+        <a href="?filtro_alertas=pendientes#tab-alertas"
+           onclick="sessionStorage.setItem('tab_perfil','tab-alertas')"
+           class="btn btn-sm {% if solo_pend_alertas %}btn-primary{% else %}btn-ghost{% endif %}">
+          Pendientes
+        </a>
+        <a href="?filtro_alertas=todas#tab-alertas"
+           onclick="sessionStorage.setItem('tab_perfil','tab-alertas')"
+           class="btn btn-sm {% if not solo_pend_alertas %}btn-primary{% else %}btn-ghost{% endif %}">
+          Todas
+        </a>
+      </div>
+    </div>
+
+    <!-- Lista de alertas -->
     {% for a in alertas %}
     <div style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:8px;">
       <div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap;">
@@ -249,8 +267,35 @@
       <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">{{ a.timestamp }}</div>
     </div>
     {% else %}
-    <p style="font-size:14px;color:#9CA3AF;">Sin alertas registradas.</p>
+    <p style="font-size:14px;color:#9CA3AF;">No hay alertas {{ 'pendientes' if solo_pend_alertas else '' }} para este paciente.</p>
     {% endfor %}
+
+    <!-- Sección observaciones de alertas atendidas -->
+    {% if observaciones_atendidas %}
+    <div style="margin-top:24px;">
+      <h4 style="font-size:14px;font-weight:600;color:#2C3E50;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+        <i data-lucide="clipboard-list" style="width:15px;height:15px;color:#1ABC9C;"></i>
+        Observaciones registradas al atender
+      </h4>
+      {% for obs in observaciones_atendidas %}
+      <div style="border-left:3px solid #1ABC9C;background:#F8FFFE;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+          <span class="badge badge-green">Atendida</span>
+          <span class="badge {% if 'Omis' in obs.tipo_alerta %}badge-red{% else %}badge-yellow{% endif %}">
+            {{ obs.tipo_alerta }}
+          </span>
+          <span style="font-size:11px;color:#9CA3AF;">{{ obs.medicamento }}</span>
+          <span style="font-size:11px;color:#9CA3AF;margin-left:auto;">{{ obs.fecha }}</span>
+        </div>
+        <p style="font-size:13px;color:#2C3E50;margin:0;line-height:1.5;">
+          <i data-lucide="message-square" style="width:12px;height:12px;color:#5D6D7E;vertical-align:middle;margin-right:4px;"></i>
+          {{ obs.observacion }}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
   </div>
 
 </div>
@@ -346,8 +391,8 @@
 {% block scripts %}
 <script>
 lucide.createIcons();
-{% if paciente.pct is not none %}
-{% set adh_p = paciente.pct|float|round|int %}
+{% set adh_p = (pct_mongo if pct_mongo is defined and pct_mongo > 0 else (paciente.pct|float if paciente.pct is not none else 0))|round|int %}
+{% if adh_p > 0 %}
 {% set clr_p = '#1ABC9C' if adh_p >= 80 else ('#F39C12' if adh_p >= 50 else '#E74C3C') %}
 Highcharts.chart('gauge_perfil', {
   chart: { type: 'solidgauge', backgroundColor: 'transparent', height: 90, margin: [0,0,0,0], spacing: [0,0,0,0] },
@@ -383,6 +428,15 @@ function showTab(id, btn) {
   btn.style.color = '#1B4F72';
   btn.style.borderBottom = '2px solid #1B4F72';
 }
+
+// Al cargar, si viene filtro_alertas en la URL, activar tab alertas
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('filtro_alertas')) {
+        const btn = document.getElementById('btn-tab-alertas');
+        if (btn) showTab('tab-alertas', btn);
+    }
+});
 
 function addMedPerfil() {
   var list = document.getElementById('meds-list-perfil');

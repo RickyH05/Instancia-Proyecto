@@ -96,7 +96,7 @@
     <div class="card-header"><h3>Adherencia pacientes</h3></div>
     <div class="card-body" style="padding:8px;">
       {% if adherencia %}
-      <div id="chart_dash_adh" style="height:{{ [adherencia|length * 36, 160]|max }}px;"></div>
+      <div id="chart_dash_adh" style="height:{{ [adherencia|length * 48, 160]|max }}px;"></div>
       {% else %}
       <p style="font-size:13px;color:#9CA3AF;">Sin datos de adherencia.</p>
       {% endif %}
@@ -109,14 +109,42 @@
 lucide.createIcons();
 {% if adherencia %}
 Highcharts.chart('chart_dash_adh', {
-  chart: { type: 'bar', backgroundColor: 'transparent', margin: [0,0,20,0], spacing: [0,0,0,0] },
+  chart: {
+    type: 'bar',
+    backgroundColor: 'transparent',
+    marginLeft: 130,
+    marginRight: 40,
+    marginTop: 10,
+    marginBottom: 20,
+    spacing: [0, 0, 0, 0]
+  },
   title: null,
-  xAxis: { categories: [{% for p in adherencia %}'{{ p.nombre }}'{% if not loop.last %},{% endif %}{% endfor %}],
-    labels: { style: { fontSize: '11px', color: '#5D6D7E' } }, lineWidth: 0, tickWidth: 0 },
-  yAxis: { min: 0, max: 100, title: null, labels: { enabled: false }, gridLineWidth: 0 },
+  xAxis: {
+    categories: [{% for p in adherencia %}'{{ p.nombre }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    labels: {
+      style: { fontSize: '12px', color: '#2C3E50', fontWeight: '500' },
+      align: 'right'
+    },
+    lineWidth: 0,
+    tickWidth: 0
+  },
+  yAxis: {
+    min: 0, max: 100,
+    title: null,
+    labels: { enabled: false },
+    gridLineWidth: 0
+  },
   tooltip: { valueSuffix: '%', style: { fontSize: '12px' } },
-  plotOptions: { bar: { borderRadius: 3, dataLabels: { enabled: true, format: '{y}%',
-    style: { fontSize: '11px', fontWeight: '600', textOutline: 'none' } } } },
+  plotOptions: {
+    bar: {
+      borderRadius: 4,
+      dataLabels: {
+        enabled: true,
+        format: '{y}%',
+        style: { fontSize: '12px', fontWeight: '600', textOutline: 'none' }
+      }
+    }
+  },
   legend: { enabled: false },
   series: [{
     name: 'Adherencia',

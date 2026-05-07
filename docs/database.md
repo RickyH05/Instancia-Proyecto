@@ -115,6 +115,7 @@ p_id, p_ok, p_msg = cur.fetchone()
 | evento_nfc | `timestamp_lectura`, `fecha_registro`, `desfase_min` |
 | cuidador_horario | `hora_inicio`, `hora_fin`, `dia_semana`, `id_paciente_cuidador` |
 | paciente_cuidador | `id_paciente_cuidador` (PK), `es_principal`, `activo` |
+| nfc_pendiente | `uid_nfc` (PK), `id_cuidador`, `timestamp_scan`, `intentos` |
 
 ---
 
@@ -680,6 +681,10 @@ if p_ok == 1:
 | `'Exitoso'` | Toma dentro de ventana de tolerancia |
 | `'Tardío'` | Toma fuera de tolerancia pero registrada |
 | `'Duplicado'` | Ya existe evento exitoso/tardío para esa agenda en la misma ventana |
+
+> **Importante:** si `sp_registrar_toma_nfc` devuelve `p_ok = -1` (UID no existe en `etiqueta_nfc`),
+> el flujo debe redirigir al cuidador a `sp_nfc_escaneo_desconocido` para registrar el UID
+> en `nfc_pendiente` y luego vincularlo. Ver sección 20.
 
 ---
 
@@ -1374,7 +1379,7 @@ conn.commit()
 
 ---
 
-## 19. SPs nuevos (agregados post-v9)
+## 19. SPs existentes post-v9
 
 ### `sp_gestion_etiqueta_nfc`
 
@@ -1442,18 +1447,11 @@ GPS activo del cuidador con su última ubicación registrada.
 | 7 | timestamp_ubicacion |
 
 ```python
-# Reemplaza SELECT directo a gps_imei + ubicacion_gps
 cur.execute("BEGIN")
 cur.execute("CALL sp_rep_gps_cuidador('cur_gps', %s)", [id_cuidador])
 cur.execute("FETCH ALL FROM cur_gps")
 gps_row = cur.fetchone()   # None si el cuidador no tiene GPS activo
 conn.commit()
-
-if gps_row:
-    imei      = gps_row[1]
-    latitud   = gps_row[5]
-    longitud  = gps_row[6]
-    ultima_ts = gps_row[7]
 ```
 
 ---
@@ -1475,83 +1473,218 @@ Igual que `sp_rep_perfil_paciente` pero incluye `foto_perfil`.
 | 4 | fecha_nacimiento |
 | 5 | curp |
 | 6 | activo |
-| 7 | foto_perfil ← col extra vs sp_rep_perfil_paciente |
+| 7 | foto_perfil |
 | 8 | diagnosticos |
 | 9 | cuidador_princ |
 | 10 | medicamentos |
-
-```python
-# Reemplaza SELECT foto_perfil FROM paciente WHERE id_paciente = %s
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_perfil_paciente_foto('cur_perf', %s)", [id_paciente])
-cur.execute("FETCH ALL FROM cur_perf")
-row = cur.fetchone()
-conn.commit()
-
-foto     = row[7]
-nombre   = row[1]
-apellido = row[2]
-```
 
 ---
 
 ### `sp_rep_conteos_admin`
 
-Todos los conteos del dashboard admin en **una sola fila**.
-
 **Firma:** `(INOUT io_cursor)`
 
-**Columnas:**
-
-| col | campo |
-|-----|-------|
-| 0 | total_medicos |
-| 1 | total_cuidadores |
-| 2 | total_pacientes |
-| 3 | total_medicamentos |
-| 4 | total_gps |
-| 5 | total_beacon |
-| 6 | total_alertas_pendientes |
-
-```python
-# Reemplaza los 7 SELECT COUNT(*) directos del admin_dashboard
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_conteos_admin('cur_conteos')")
-cur.execute("FETCH ALL FROM cur_conteos")
-row = cur.fetchone()
-conn.commit()
-
-total_medicos            = row[0]
-total_cuidadores         = row[1]
-total_pacientes          = row[2]
-total_medicamentos       = row[3]
-total_gps                = row[4]
-total_beacon             = row[5]
-total_alertas_pendientes = row[6]
-```
+**Columnas:** `total_medicos, total_cuidadores, total_pacientes, total_medicamentos, total_gps, total_beacon, total_alertas_pendientes`
 
 ---
 
 ### `sp_rep_unidades_dosis`
 
-Lista todas las unidades de dosis para poblar `<select>` en formularios.
-
 **Firma:** `(INOUT io_cursor)`
 
 **Columnas:** `id_unidad, abreviatura, descripcion`
 
-```python
-cur.execute("BEGIN")
-cur.execute("CALL sp_rep_unidades_dosis('cur_uni')")
-cur.execute("FETCH ALL FROM cur_uni")
-unidades = cur.fetchall()
-conn.commit()
-# En template: u[0]=id_unidad, u[1]=abreviatura, u[2]=descripcion
+---
+
+## 20. SPs del flujo de vinculación NFC (nuevos)
+
+> **Contexto:** El médico crea recetas sin asignar UID. Cuando el cuidador escanea un pastillero
+> nuevo por primera vez, el sistema guarda el UID en `nfc_pendiente` y le permite seleccionar
+> a qué medicamento vincularlo. Una vez vinculado, el UID queda registrado en `etiqueta_nfc`
+> y el flujo normal de `sp_registrar_toma_nfc` puede funcionar.
+
+### Tabla `nfc_pendiente`
+
+```sql
+CREATE TABLE nfc_pendiente (
+    uid_nfc        VARCHAR(100) PRIMARY KEY,
+    id_cuidador    INTEGER NOT NULL,
+    timestamp_scan TIMESTAMP NOT NULL DEFAULT NOW(),
+    intentos       INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (id_cuidador) REFERENCES cuidador(id_cuidador)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
 ```
 
 ---
 
-## 20. Triggers automáticos (no llamar directamente)
+### `sp_nfc_escaneo_desconocido`
+
+Se llama cuando `sp_registrar_toma_nfc` devuelve `p_ok = -1` (UID no existe en `etiqueta_nfc`).
+Guarda el UID en `nfc_pendiente` para vincularlo después.
+
+**Firma completa:**
+```sql
+CALL sp_nfc_escaneo_desconocido(
+    p_uid       VARCHAR(100) IN,
+    p_cuidador  INTEGER IN,
+    p_ok        INTEGER OUT,
+    p_msg       VARCHAR(300) OUT,
+    io_cursor   REFCURSOR INOUT
+)
+```
+
+**Cursor devuelve:** `ok, msg`
+
+**Códigos `p_ok`:**
+| Valor | Significado |
+|-------|-------------|
+| `1`   | UID guardado en `nfc_pendiente` (nuevo o incrementó `intentos`) |
+| `-1`  | UID ya vinculado a un medicamento activo — no necesita vinculación |
+| `-100`| Error inesperado |
+
+```python
+cur.execute("BEGIN")
+cur.execute(
+    "CALL sp_nfc_escaneo_desconocido(%s, %s, NULL, NULL, 'cur_nfc_desc')",
+    [uid_nfc, id_cuidador]
+)
+p_ok, p_msg = cur.fetchone()
+conn.commit()
+
+if p_ok == 1:
+    # Redirigir a pantalla de vinculación
+    return redirect(url_for('cuidador_nfc_vincular', uid=uid_nfc))
+elif p_ok == -1:
+    flash('Este NFC ya está vinculado a un medicamento.', 'warning')
+```
+
+---
+
+### `sp_nfc_medicamentos_sin_vincular`
+
+Lista los medicamentos activos del paciente asignado al cuidador que aún no tienen
+una etiqueta NFC activa. Se usa para poblar el selector en la pantalla de vinculación.
+
+**Firma completa:**
+```sql
+CALL sp_nfc_medicamentos_sin_vincular(
+    p_cuidador  INTEGER IN,
+    p_ok        INTEGER OUT,
+    p_msg       VARCHAR(300) OUT,
+    io_cursor   REFCURSOR INOUT
+)
+```
+
+**Cursor devuelve:**
+
+| col | campo |
+|-----|-------|
+| 0 | id_receta_medicamento |
+| 1 | nombre_generico |
+| 2 | dosis_prescrita |
+| 3 | abreviatura (unidad) |
+| 4 | frecuencia_horas |
+| 5 | fecha_fin (de la receta) |
+
+```python
+cur.execute("BEGIN")
+cur.execute(
+    "CALL sp_nfc_medicamentos_sin_vincular(%s, NULL, NULL, 'cur_sin_nfc')",
+    [id_cuidador]
+)
+p_ok, p_msg = cur.fetchone()
+cur.execute("FETCH ALL FROM cur_sin_nfc")
+medicamentos = cur.fetchall()
+conn.commit()
+
+# En template:
+# med[0] = id_receta_medicamento  ← valor del <option>
+# med[1] = nombre_generico        ← texto del <option>
+# med[2] = dosis_prescrita
+# med[3] = abreviatura
+# med[4] = frecuencia_horas
+# med[5] = fecha_fin
+```
+
+---
+
+### `sp_nfc_vincular`
+
+Vincula un UID de `nfc_pendiente` a un `id_receta_medicamento`, lo inserta en
+`etiqueta_nfc` y lo elimina de `nfc_pendiente`.
+
+**Firma completa:**
+```sql
+CALL sp_nfc_vincular(
+    p_uid       VARCHAR(100) IN,
+    p_rm        INTEGER IN,        -- FK receta_medicamento.id_receta_medicamento
+    p_cuidador  INTEGER IN,
+    p_ok        INTEGER OUT,
+    p_msg       VARCHAR(300) OUT,
+    io_cursor   REFCURSOR INOUT
+)
+```
+
+**Cursor devuelve:** `ok, msg`
+
+**Códigos `p_ok`:**
+| Valor | Significado |
+|-------|-------------|
+| `1`   | NFC vinculado correctamente, borrado de `nfc_pendiente` |
+| `-1`  | UID no encontrado en `nfc_pendiente` para este cuidador |
+| `-2`  | El medicamento ya tiene una etiqueta NFC activa |
+| `-10` | UID duplicado (ya existe en `etiqueta_nfc`) |
+| `-100`| Error inesperado |
+
+```python
+uid_nfc           = request.form.get('uid_nfc')
+id_receta_med     = request.form.get('id_receta_medicamento')
+id_cuidador       = session['id_rol']
+
+cur.execute("BEGIN")
+cur.execute(
+    "CALL sp_nfc_vincular(%s, %s, %s, NULL, NULL, 'cur_vincular')",
+    [uid_nfc, id_receta_med, id_cuidador]
+)
+p_ok, p_msg = cur.fetchone()
+conn.commit()
+
+if p_ok == 1:
+    flash('Pastillero vinculado correctamente.', 'success')
+    return redirect(url_for('cuidador_nfc_escaneo'))
+else:
+    flash(p_msg, 'danger')
+    return redirect(url_for('cuidador_nfc_vincular', uid=uid_nfc))
+```
+
+---
+
+### Flujo completo en `app.py`
+
+```
+POST /cuidador/escanear
+        ↓
+sp_registrar_toma_nfc(uid, ...)
+        ↓
+  p_ok == 1  →  mostrar resultado de toma (normal)
+  p_ok == -1 →  sp_nfc_escaneo_desconocido(uid, cuidador)
+                        ↓
+                  redirect → GET /cuidador/nfc/vincular/<uid>
+                        ↓
+              sp_nfc_medicamentos_sin_vincular(cuidador)
+              → render nfc_vincular.html con lista de medicamentos
+                        ↓
+              POST /cuidador/nfc/vincular
+                        ↓
+              sp_nfc_vincular(uid, id_receta_medicamento, cuidador)
+                        ↓
+              redirect → /cuidador/escanear (ya puede escanear normalmente)
+```
+
+---
+
+## 21. Triggers automáticos (no llamar directamente)
 
 | Trigger | Tabla | Momento | Qué hace |
 |---------|-------|---------|----------|
@@ -1593,9 +1726,12 @@ conn.commit()
 | `sp_asignar_especialidad` | — | Admin |
 | `sp_crear_usuario_admin` | — | Admin |
 | `sp_gestion_etiqueta_nfc` | I/U/L | Admin/Médico |
+| `sp_nfc_escaneo_desconocido` | — | Cuidador |
+| `sp_nfc_medicamentos_sin_vincular` | — | Cuidador |
+| `sp_nfc_vincular` | — | Cuidador |
 | ~~`sp_login`~~ | — | ~~No usar~~ |
 
-### Reportes sp_rep_* (31 SPs)
+### Reportes sp_rep_* (34 SPs)
 
 | SP | Rol |
 |----|-----|
@@ -1633,3 +1769,337 @@ conn.commit()
 | `sp_rep_perfil_paciente_foto` | Médico/Cuidador |
 | `sp_rep_conteos_admin` | Admin |
 | `sp_rep_unidades_dosis` | Admin |
+
+# SECCIÓN MONGODB — Agregar al final de docs/database.md
+# ================================================================
+# Pega todo este contenido al final de tu archivo docs/database.md
+# ================================================================
+
+---
+
+## INTEGRACIÓN MONGODB
+
+> **Base de datos:** `medinfc_mongo`
+> **Conexión:** `mongodb://localhost:27017/`
+> **Librería:** `pymongo` — `from pymongo import MongoClient`
+
+---
+
+### Conexión (patrón singleton)
+
+```python
+# mongo_client.py — importar en app.py
+from pymongo import MongoClient
+from datetime import datetime, timedelta, timezone
+import os
+
+_mongo_client = None
+
+def get_mongo_db():
+    global _mongo_client
+    if _mongo_client is None:
+        _mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017/"))
+    return _mongo_client[os.getenv("MONGO_DB", "medinfc_mongo")]
+```
+
+---
+
+### Colecciones
+
+#### `perfil_clinico_paciente` — Datos semi-estructurados
+Notas clínicas, alergias y preferencias de toma. Estructura variable por paciente.
+ID compartido: `pg_id_paciente` → `paciente.id_paciente`
+
+```python
+def get_perfil_clinico(pg_id_paciente):
+    db = get_mongo_db()
+    return db.perfil_clinico_paciente.find_one(
+        {"pg_id_paciente": pg_id_paciente},
+        {"_id": 0}
+    )
+
+def upsert_perfil_clinico(pg_id_paciente, datos_clinicos):
+    db = get_mongo_db()
+    db.perfil_clinico_paciente.update_one(
+        {"pg_id_paciente": pg_id_paciente},
+        {"$set": {"datos_clinicos": datos_clinicos,
+                  "actualizado_en": datetime.now(timezone.utc)}},
+        upsert=True
+    )
+```
+
+**Documento ejemplo:**
+```json
+{
+  "pg_id_paciente": 1,
+  "pg_id_medico": 1,
+  "nombre_completo": "Elena Martinez",
+  "datos_clinicos": {
+    "alergias": ["Penicilina"],
+    "condiciones_extra": ["Diabetes tipo 2"],
+    "notas_medico": [{"fecha": "...", "nota": "..."}],
+    "preferencias_toma": {"hora_preferida": "08:00", "con_alimentos": true}
+  },
+  "resumen_adherencia": {"pct_ultimo_mes": 82.5, "racha_correctas": 5}
+}
+```
+
+---
+
+#### `logs_acceso` — Logs de autenticación
+TTL automático: 90 días.
+ID compartido: `pg_id_usuario` → `usuario.id_usuario`
+
+```python
+def registrar_log_acceso(pg_id_usuario, email, rol, ip,
+                          exitoso, user_agent=None, motivo_fallo=None):
+    db = get_mongo_db()
+    db.logs_acceso.insert_one({
+        "pg_id_usuario": pg_id_usuario,
+        "email":         email,
+        "rol":           rol,
+        "ip":            ip,
+        "exitoso":       exitoso,
+        "timestamp":     datetime.now(timezone.utc),
+        "user_agent":    user_agent,
+        "motivo_fallo":  motivo_fallo
+    })
+```
+
+**Llamar desde la ruta de login:**
+```python
+# Login exitoso
+registrar_log_acceso(row[0], email, row[2], request.remote_addr,
+                     True, request.headers.get('User-Agent'))
+# Login fallido
+registrar_log_acceso(None, email, None, request.remote_addr,
+                     False, request.headers.get('User-Agent'), "Credenciales incorrectas")
+```
+
+---
+
+#### `logs_sistema` — Logs de operaciones internas
+TTL automático: 30 días. Estructura libre — el campo `detalle` varía por módulo.
+
+```python
+def registrar_log_sistema(nivel, modulo, mensaje, detalle=None, traceback_str=None):
+    db = get_mongo_db()
+    db.logs_sistema.insert_one({
+        "nivel":     nivel,   # "INFO" | "WARNING" | "ERROR" | "CRITICAL"
+        "modulo":    modulo,
+        "mensaje":   mensaje,
+        "timestamp": datetime.now(timezone.utc),
+        "detalle":   detalle,
+        "traceback": traceback_str
+    })
+```
+
+---
+
+#### `eventos_nfc_rt` — Eventos NFC en tiempo real
+Copia desnormalizada de `evento_nfc`. Permite leer el feed sin JOINs.
+TTL automático: 30 días.
+ID compartido: `pg_id_evento` → `evento_nfc.id_evento`
+
+```python
+def sync_evento_nfc(pg_id_evento, pg_id_receta_medicamento, uid_nfc,
+                    timestamp_lectura, origen, resultado, desfase_min,
+                    paciente, medicamento, cuidador=None, proximidad=None):
+    """
+    Llamar DESPUÉS de sp_registrar_toma_nfc exitoso.
+    paciente   = {"pg_id_paciente": int, "nombre_completo": str}
+    medicamento= {"pg_id_medicamento": int, "nombre_generico": str,
+                  "dosis_prescrita": int, "unidad": str}
+    cuidador   = {"pg_id_cuidador": int, "nombre_completo": str} | None
+    proximidad = {"gps_verificado": bool, "beacon_detectado": bool,
+                  "proximidad_valida": bool, "distancia_metros": float} | None
+    """
+    db = get_mongo_db()
+    db.eventos_nfc_rt.replace_one(
+        {"pg_id_evento": pg_id_evento},
+        {
+            "pg_id_evento":             pg_id_evento,
+            "pg_id_receta_medicamento": pg_id_receta_medicamento,
+            "uid_nfc":                  uid_nfc,
+            "timestamp_lectura":        timestamp_lectura,
+            "fecha_registro":           datetime.now(timezone.utc),
+            "origen":                   origen,
+            "resultado":                resultado,
+            "desfase_min":              desfase_min,
+            "paciente":                 paciente,
+            "medicamento":              medicamento,
+            "cuidador":                 cuidador,
+            "proximidad":               proximidad
+        },
+        upsert=True
+    )
+```
+
+---
+
+#### `alertas_rt` — Alertas en tiempo real
+Badge del menú y notificaciones sin llamar SP.
+TTL automático: 60 días.
+ID compartido: `pg_id_alerta` → `alerta.id_alerta`
+
+```python
+def sync_alerta(pg_id_alerta, pg_id_receta_medicamento, pg_id_evento,
+                prioridad, tipo, estado, canal, timestamp_gen,
+                paciente, medico, medicamento_nombre):
+    db = get_mongo_db()
+    db.alertas_rt.replace_one(
+        {"pg_id_alerta": pg_id_alerta},
+        {
+            "pg_id_alerta":             pg_id_alerta,
+            "pg_id_receta_medicamento": pg_id_receta_medicamento,
+            "pg_id_evento":             pg_id_evento,
+            "prioridad":                prioridad,
+            "tipo":                     tipo,
+            "estado":                   estado,
+            "canal":                    canal,
+            "timestamp_gen":            timestamp_gen,
+            "leida":                    False,
+            "paciente":                 paciente,
+            "medico":                   medico,
+            "medicamento_nombre":       medicamento_nombre
+        },
+        upsert=True
+    )
+
+def get_badge_alertas(pg_id_medico):
+    """Reemplaza sp_rep_badge_alertas — < 5ms sin SP."""
+    db = get_mongo_db()
+    return db.alertas_rt.count_documents(
+        {"medico.pg_id_medico": pg_id_medico, "estado": "pendiente"}
+    )
+```
+
+---
+
+#### `historico_adherencia` — Histórico masivo ← FUENTE DE LAS 3 GRÁFICAS
+Métricas diarias por paciente. Se sincroniza cada noche desde PostgreSQL.
+ID compartido: `pg_id_paciente` → `paciente.id_paciente`
+
+**Datos actuales en medinfc_mongo (datos reales de PG):**
+| pg_id_paciente | nombre | pct_base |
+|---|---|---|
+| 1 | Elena Martinez | ~82.5% |
+| 2 | Hector Gonzalez | ~55.5% |
+| 3 | Consuelo Vazquez | ~91.5% |
+
+```python
+# ── GRÁFICA 1: Barras comparativas (doctor/dashboard.html) ──────
+def get_adherencia_por_medico(pg_id_medico, dias=14):
+    """Adherencia promedio de cada paciente del médico."""
+    db = get_mongo_db()
+    desde = datetime.now(timezone.utc) - timedelta(days=dias)
+    return list(db.historico_adherencia.aggregate([
+        {"$match": {"pg_id_medico": pg_id_medico, "fecha": {"$gte": desde}}},
+        {"$group": {
+            "_id":    "$pg_id_paciente",
+            "nombre": {"$first": "$nombre_paciente"},
+            "pct":    {"$avg":  "$metricas.pct_adherencia"},
+            "correctas": {"$sum": "$metricas.correctas"},
+            "tardias":   {"$sum": "$metricas.tardias"},
+            "omitidas":  {"$sum": "$metricas.omitidas"}
+        }},
+        {"$sort": {"pct": -1}}
+    ]))
+
+# ── GRÁFICA 2: Series de tiempo (cuidador/grafica_adherencia.html) ──
+def get_historial_paciente(pg_id_paciente, dias=14):
+    """Serie diaria de tomas para graficar evolución."""
+    db = get_mongo_db()
+    desde = datetime.now(timezone.utc) - timedelta(days=dias)
+    return list(db.historico_adherencia.find(
+        {"pg_id_paciente": pg_id_paciente, "fecha": {"$gte": desde}},
+        {"_id": 0, "fecha": 1, "metricas": 1, "detalle_medicamentos": 1}
+    ).sort("fecha", 1))
+
+# ── GRÁFICA 3: Solid gauge indicador (doctor/paciente_perfil.html) ──
+def get_pct_promedio_paciente(pg_id_paciente, dias=14):
+    """Porcentaje promedio de adherencia — alimenta el solid gauge."""
+    db = get_mongo_db()
+    desde = datetime.now(timezone.utc) - timedelta(days=dias)
+    resultado = list(db.historico_adherencia.aggregate([
+        {"$match": {"pg_id_paciente": pg_id_paciente, "fecha": {"$gte": desde}}},
+        {"$group": {"_id": None, "pct": {"$avg": "$metricas.pct_adherencia"}}}
+    ]))
+    return round(resultado[0]["pct"], 1) if resultado else 0.0
+
+# ── Sincronizar un día desde PG → Mongo ─────────────────────────
+def upsert_historico_dia(pg_id_paciente, pg_id_medico, nombre_paciente,
+                          fecha, metricas, detalle_medicamentos):
+    """
+    Llamar desde el scheduler nocturno después de cerrar el día en PG.
+    metricas = {"total": int, "correctas": int, "tardias": int,
+                "omitidas": int, "pendientes": int, "pct_adherencia": float}
+    """
+    db = get_mongo_db()
+    fecha_solo = fecha.replace(hour=0, minute=0, second=0, microsecond=0)
+    db.historico_adherencia.replace_one(
+        {"pg_id_paciente": pg_id_paciente, "fecha": fecha_solo},
+        {
+            "pg_id_paciente":       pg_id_paciente,
+            "pg_id_medico":         pg_id_medico,
+            "nombre_paciente":      nombre_paciente,
+            "fecha":                fecha_solo,
+            "metricas":             metricas,
+            "detalle_medicamentos": detalle_medicamentos
+        },
+        upsert=True
+    )
+```
+
+---
+
+#### `ubicaciones_gps_hist` — Histórico GPS masivo
+PostgreSQL solo guarda la última coordenada. MongoDB acumula el trayecto completo.
+TTL automático: 6 meses.
+ID compartido: `pg_id_gps` → `gps_imei.id_gps`
+
+```python
+def agregar_ubicacion_gps(pg_id_gps, pg_id_paciente, pg_id_cuidador,
+                           nombre_paciente, latitud, longitud,
+                           precision_metros=None, en_domicilio=None):
+    db = get_mongo_db()
+    db.ubicaciones_gps_hist.insert_one({
+        "pg_id_gps":       pg_id_gps,
+        "pg_id_paciente":  pg_id_paciente,
+        "pg_id_cuidador":  pg_id_cuidador,
+        "nombre_paciente": nombre_paciente,
+        "coordenadas": {
+            "latitud":          latitud,
+            "longitud":         longitud,
+            "precision_metros": precision_metros
+        },
+        "timestamp":    datetime.now(timezone.utc),
+        "en_domicilio": en_domicilio
+    })
+
+def get_trayecto_paciente(pg_id_paciente, horas=24):
+    """Trayecto GPS de las últimas N horas — solo disponible en MongoDB."""
+    db = get_mongo_db()
+    desde = datetime.now(timezone.utc) - timedelta(hours=horas)
+    return list(db.ubicaciones_gps_hist.find(
+        {"pg_id_paciente": pg_id_paciente, "timestamp": {"$gte": desde}},
+        {"_id": 0, "coordenadas": 1, "timestamp": 1, "en_domicilio": 1}
+    ).sort("timestamp", 1))
+```
+
+---
+
+### Resumen: cuándo usa Flask PostgreSQL vs MongoDB
+
+| Acción | Usa |
+|--------|-----|
+| Registrar evento NFC | PostgreSQL SP → luego sync a Mongo |
+| Crear/editar paciente, receta, cuidador | PostgreSQL SP siempre |
+| Reportes con JOINs complejos (tendencia, riesgo, ranking) | PostgreSQL SP siempre |
+| Gráfica 1 — barras adherencia por médico | **MongoDB** `get_adherencia_por_medico()` |
+| Gráfica 2 — serie de tiempo tomas paciente | **MongoDB** `get_historial_paciente()` |
+| Gráfica 3 — solid gauge % adherencia | **MongoDB** `get_pct_promedio_paciente()` |
+| Badge de alertas del menú | **MongoDB** `get_badge_alertas()` |
+| Log de intentos de login | **MongoDB** `registrar_log_acceso()` |
+| Trayecto GPS del paciente | **MongoDB** `get_trayecto_paciente()` |
+| Perfil clínico con notas semi-estructuradas | **MongoDB** `get_perfil_clinico()` |

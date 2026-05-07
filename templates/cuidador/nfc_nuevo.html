@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Vincular nuevo pastillero{% endblock %}
+{% block page_title %}Vincular nuevo pastillero{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('cuidador_home') }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver
+</a>
+
+{# ── Overlay de escaneo NFC ───────────────────────────────────────────── #}
+<div id="nfc-overlay" style="display:none;position:fixed;inset:0;background:rgba(27,79,114,.92);
+     z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:24px;">
+  <div style="position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center;">
+    <span class="nfc-wave" style="animation-delay:0s;"></span>
+    <span class="nfc-wave" style="animation-delay:.7s;"></span>
+    <span class="nfc-wave" style="animation-delay:1.4s;"></span>
+    <div style="width:56px;height:56px;border-radius:50%;background:#1ABC9C;display:flex;align-items:center;justify-content:center;z-index:1;">
+      <i data-lucide="wifi" style="width:28px;height:28px;color:#fff;transform:rotate(90deg);"></i>
+    </div>
+  </div>
+  <p style="color:#fff;font-size:16px;font-weight:600;margin:0;text-align:center;">Acerca el teléfono a la etiqueta NFC...</p>
+  <button type="button" onclick="cancelarScan()" class="btn btn-ghost"
+    style="color:#fff;border-color:rgba(255,255,255,.4);">Cancelar</button>
+</div>
+
+<div id="nfc-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+     background:#1ABC9C;color:#fff;padding:10px 20px;border-radius:24px;font-size:14px;
+     font-weight:600;z-index:1000;box-shadow:0 4px 16px rgba(26,188,156,.4);white-space:nowrap;"></div>
+
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:32px 24px 24px;">
+    <div style="width:72px;height:72px;border-radius:50%;background:rgba(26,188,156,.12);
+         display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+      <i data-lucide="wifi" style="width:36px;height:36px;color:#1ABC9C;transform:rotate(90deg);"></i>
+    </div>
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:6px;">Vincular pastillero NFC</h2>
+    <p style="font-size:14px;color:#5D6D7E;margin-bottom:24px;">
+      Escanea la etiqueta NFC del pastillero o ingresa el UID manualmente.
+    </p>
+
+    <form method="POST" action="{{ url_for('cuidador_nfc_nuevo') }}" id="form-nfc-nuevo">
+      <div class="form-group" style="text-align:left;">
+        <button type="button" onclick="iniciarScan()"
+          style="width:100%;padding:14px;border:2px dashed #1ABC9C;border-radius:10px;
+                 background:rgba(26,188,156,.06);color:#1ABC9C;font-size:15px;font-weight:600;
+                 cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
+                 margin-bottom:14px;transition:background .2s;">
+          <i data-lucide="wifi" style="width:20px;height:20px;transform:rotate(90deg);"></i>
+          Escanear etiqueta NFC
+        </button>
+        <label class="form-label">UID de la etiqueta <span style="color:#E74C3C;">*</span></label>
+        <input type="text" name="uid_nfc" id="inp-uid" class="form-control"
+          placeholder="Ej: NFC-RM-001" required style="font-family:monospace;">
+        <span style="font-size:12px;color:#9CA3AF;">Pulsa el botón para simular el escaneo o ingresa el UID manualmente.</span>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <a href="{{ url_for('cuidador_home') }}" class="btn btn-ghost">Cancelar</a>
+        <button type="submit" class="btn btn-accent" style="flex:1;">
+          <i data-lucide="link" style="width:16px;height:16px;"></i> Continuar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block head %}
+<style>
+.nfc-wave {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid #1ABC9C;
+  animation: nfc-expand 2.1s ease-out infinite;
+  opacity: 0;
+}
+@keyframes nfc-expand {
+  0%   { width: 56px; height: 56px; opacity: .8; }
+  100% { width: 120px; height: 120px; opacity: 0; }
+}
+</style>
+{% endblock %}
+{% block scripts %}<script>
+lucide.createIcons();
+
+var _scanTimer = null;
+
+function iniciarScan() {
+  document.getElementById('nfc-overlay').style.display = 'flex';
+  _scanTimer = setTimeout(function() {
+    var uids = ['NFC-RM-001','NFC-RM-002','NFC-RM-003','NFC-RM-004','NFC-RM-005'];
+    var uid  = uids[Math.floor(Math.random() * uids.length)];
+    document.getElementById('nfc-overlay').style.display = 'none';
+    document.getElementById('inp-uid').value = uid;
+    mostrarToast('✓ Etiqueta detectada: ' + uid);
+  }, 2500);
+}
+
+function cancelarScan() {
+  clearTimeout(_scanTimer);
+  document.getElementById('nfc-overlay').style.display = 'none';
+}
+
+function mostrarToast(msg) {
+  var t = document.getElementById('nfc-toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(function(){ t.style.display = 'none'; }, 3000);
+}
+</script>{% endblock %}
