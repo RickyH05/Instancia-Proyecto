@@ -104,5 +104,19 @@
 {% else %}
 <p style="font-size:14px;color:#5D6D7E;">No hay pacientes asignados para hoy.</p>
 {% endif %}
+{% if paciente_principal_id %}
+<div id="gps-tracker-data"
+     data-id-paciente="{{ paciente_principal_id }}"
+     data-nombre-paciente="{{ paciente_principal_nombre }}"
+     style="display:none;"></div>
+<div id="gps-status" title="GPS activo"
+     style="position:fixed;bottom:80px;right:20px;width:12px;height:12px;
+            border-radius:50%;background:#9CA3AF;opacity:0.8;z-index:999;"></div>
+{% endif %}
 {% endblock %}
-{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% if paciente_principal_id %}
+<script src="{{ url_for('static', filename='js/gps_tracker.js') }}"></script>
+{% endif %}
+{% endblock %}

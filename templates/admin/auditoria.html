@@ -27,21 +27,20 @@
     </tr></thead>
     <tbody>
       {% for r in rows %}
-      {# cols: id_audit, tabla, id_reg, accion, campo, val_antes, val_despues, usuario_db, id_usr_app, ts #}
       <tr data-searchable>
-        <td style="color:#9CA3AF;font-size:12px;">{{ r[0] }}</td>
-        <td style="font-family:monospace;font-size:13px;font-weight:500;">{{ r[1] }}</td>
-        <td style="font-size:13px;color:#5D6D7E;">#{{ r[2] }}</td>
+        <td style="color:#9CA3AF;font-size:12px;">{{ r.id }}</td>
+        <td style="font-family:monospace;font-size:13px;font-weight:500;">{{ r.tabla }}</td>
+        <td style="font-size:13px;color:#5D6D7E;">#{{ r.id_reg }}</td>
         <td>
-          <span class="badge {% if r[3]=='INSERT' %}badge-green{% elif r[3]=='UPDATE' %}badge-yellow{% else %}badge-red{% endif %}">
-            {{ r[3] }}
+          <span class="badge {% if r.accion=='INSERT' %}badge-green{% elif r.accion=='UPDATE' %}badge-yellow{% else %}badge-red{% endif %}">
+            {{ r.accion }}
           </span>
         </td>
-        <td style="font-family:monospace;font-size:12px;color:#5D6D7E;">{{ r[4] or '—' }}</td>
-        <td style="font-size:12px;color:#9CA3AF;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r[5] }}">{{ r[5] or '—' }}</td>
-        <td style="font-size:12px;color:#2C3E50;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r[6] }}">{{ r[6] or '—' }}</td>
-        <td style="font-size:13px;color:#5D6D7E;">{{ r[8] or r[7] or '—' }}</td>
-        <td style="font-size:13px;color:#5D6D7E;">{{ r[9]|string|truncate(16,true,'') }}</td>
+        <td style="font-family:monospace;font-size:12px;color:#5D6D7E;">{{ r.campo or '—' }}</td>
+        <td style="font-size:12px;color:#9CA3AF;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r.val_antes }}">{{ r.val_antes or '—' }}</td>
+        <td style="font-size:12px;color:#2C3E50;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r.val_despues }}">{{ r.val_despues or '—' }}</td>
+        <td style="font-size:13px;color:#5D6D7E;">{{ r.nombre_usuario }}</td>
+        <td style="font-size:13px;color:#5D6D7E;">{{ r.ts|string|truncate(16,true,'') }}</td>
       </tr>
       {% else %}
       <tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:32px;">Sin registros de auditoría.</td></tr>

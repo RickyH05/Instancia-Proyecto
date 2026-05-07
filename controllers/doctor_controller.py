@@ -3,9 +3,12 @@ from datetime import date as _date
 from flask import flash, jsonify, redirect, render_template, request, session, url_for
 
 from config import get_db, guardar_foto_perfil
+import json
+
 from mongo_client import (
     get_adherencia_por_medico,
     get_pct_promedio_paciente,
+    get_trayectos_todos_pacientes,
     registrar_log_sistema,
 )
 from utils.decorators import login_requerido, rol_requerido
@@ -151,7 +154,16 @@ def doctor_paciente_nuevo():
         cur.close(); conn.close()
         flash(p_msg, "success" if p_ok == 1 else "danger")
     except Exception as e:
-        flash(f"Error al crear paciente: {e}", "danger")
+        conn.rollback()
+        error_msg = str(e)
+        if 'curp_check' in error_msg or 'curp' in error_msg.lower():
+            flash('El CURP ingresado no tiene el formato correcto. '
+                  'Debe tener exactamente 18 caracteres con el formato oficial mexicano. '
+                  'Ejemplo válido: GOMC900101HDFLRR09', 'danger')
+        elif 'unique' in error_msg.lower() or 'duplicate' in error_msg.lower():
+            flash('Ya existe un paciente registrado con ese CURP.', 'danger')
+        else:
+            flash(f'Error al crear paciente: {error_msg}', 'danger')
     return redirect(url_for("doctor_pacientes"))
 
 
@@ -640,7 +652,14 @@ def doctor_mapa():
     except Exception as e:
         flash(f"Error al cargar el mapa: {e}", "danger")
 
-    return render_template("proximidad/mapa.html", puntos=puntos)
+    con_gps = len(set(
+        c["nombre"]
+        for p in puntos
+        for c in p["cuidadores"]
+        if c["gps"]["lat"] != 0
+    ))
+
+    return render_template("proximidad/mapa.html", puntos=puntos, con_gps=con_gps)
 
 
 @login_requerido
@@ -1179,8 +1198,22 @@ def doctor_proximidad_historial():
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar historial de proximidad: {e}", "danger")
+
+    horas = int(request.args.get("horas", 24))
+    try:
+        trayectos = get_trayectos_todos_pacientes(
+            pg_id_medico=session["id_rol"],
+            horas=horas,
+        )
+    except Exception as e:
+        registrar_log_sistema("ERROR", "doctor_proximidad_historial",
+                              "Fallo MongoDB trayectos GPS", str(e))
+        trayectos = {}
+    trayectos_json = json.dumps(trayectos)
+
     return render_template("proximidad/historial.html",
-        eventos=eventos, total=total, validos=validos, sin_prox=sin_prox
+        eventos=eventos, total=total, validos=validos, sin_prox=sin_prox,
+        trayectos_json=trayectos_json, horas=horas,
     )
 
 

@@ -1,9 +1,10 @@
 import atexit
 
-from flask import Flask, jsonify, redirect, request, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import _SECRET_KEY, get_db
+from mongo_client import get_mongo_db
 
 import controllers.auth_controller   as auth
 import controllers.admin_controller  as admin
@@ -163,6 +164,44 @@ def admin_bitacora():
 @app.route("/admin/auditoria")
 def admin_auditoria():
     return admin.admin_auditoria()
+
+@app.route("/admin/logs-mongo")
+def admin_logs_mongo():
+    from mongo_client import get_logs_acceso, get_logs_sistema, get_logs_nfc_fallidos, get_mongo_db
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    if session.get("rol") != "admin":
+        return redirect(url_for("admin_dashboard"))
+
+    from datetime import timezone, timedelta
+    def fmt(logs):
+        cst = timezone(timedelta(hours=-6))  # Monterrey UTC-6
+        for log in logs:
+            if 'timestamp' in log and log['timestamp']:
+                ts = log['timestamp']
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                ts_local = ts.astimezone(cst)
+                log['timestamp'] = ts_local.strftime('%Y-%m-%d %H:%M:%S')
+        return logs
+
+    db = get_mongo_db()
+    total_acceso  = db.logs_acceso.count_documents({})
+    total_sistema = db.logs_sistema.count_documents({})
+    total_nfc     = db.logs_nfc_fallidos.count_documents({})
+
+    logs_acceso  = fmt(get_logs_acceso(limite=50))
+    logs_sistema = fmt(get_logs_sistema(limite=50))
+    logs_nfc     = fmt(get_logs_nfc_fallidos(limite=50))
+    return render_template(
+        "admin/logs_mongo.html",
+        logs_acceso   = logs_acceso,
+        logs_sistema  = logs_sistema,
+        logs_nfc      = logs_nfc,
+        total_acceso  = total_acceso,
+        total_sistema = total_sistema,
+        total_nfc     = len(logs_nfc),
+    )
 
 @app.route("/admin/accesos")
 def admin_accesos():
@@ -367,8 +406,7 @@ def api_ubicacion_gps():
         lat             = data.get("lat")
         lon             = data.get("lon")
         precision       = data.get("precision")
-        id_paciente     = data.get("id_paciente")
-        nombre_paciente = data.get("nombre_paciente", "")
+        id_paciente = data.get("id_paciente")
 
         if not lat or not lon or not id_paciente:
             return jsonify({"ok": False, "msg": "Faltan datos"}), 400
@@ -376,7 +414,7 @@ def api_ubicacion_gps():
         agregar_ubicacion_gps(
             pg_id_paciente   = int(id_paciente),
             pg_id_cuidador   = session["id_rol"],
-            nombre_paciente  = nombre_paciente,
+            nombre_cuidador  = session.get("nombre", ""),
             latitud          = float(lat),
             longitud         = float(lon),
             precision_metros = float(precision) if precision else None,
@@ -385,6 +423,116 @@ def api_ubicacion_gps():
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)}), 500
+
+
+# ─── API Traccar / OsmAnd GPS ───────────────────────────────────────────────
+
+@app.route("/api/gps", methods=["GET", "POST"])
+def api_gps_traccar():
+    """Recibe pings del protocolo OsmAnd (Traccar Client) y persiste en PG + MongoDB."""
+    # Intentar leer como JSON (Traccar Client iOS)
+    data = request.get_json(silent=True)
+    if data:
+        imei     = data.get("device_id")
+        coords   = data.get("location", {}).get("coords", {})
+        lat      = coords.get("latitude")
+        lon      = coords.get("longitude")
+        accuracy = coords.get("accuracy")
+    else:
+        # Fallback GET/POST form (OsmAnd)
+        imei     = request.args.get("id") or request.form.get("id")
+        lat      = request.args.get("lat", type=float) or (float(request.form.get("lat")) if request.form.get("lat") else None)
+        lon      = request.args.get("lon", type=float) or (float(request.form.get("lon")) if request.form.get("lon") else None)
+        accuracy = request.args.get("accuracy", type=float) or (float(request.form.get("accuracy")) if request.form.get("accuracy") else None)
+
+    if not imei or not lat or not lon:
+        return "", 400
+
+    precision = accuracy
+
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+
+        cur.execute(
+            "SELECT id_gps FROM gps_imei WHERE imei = %s AND activo = TRUE",
+            [imei],
+        )
+        row = cur.fetchone()
+
+        if row:
+            id_gps = row[0]
+            cur.execute(
+                """
+                INSERT INTO ubicacion_gps
+                    (id_gps, latitud, longitud, precision_metros, timestamp_ubicacion)
+                VALUES (%s, %s, %s, %s, NOW())
+                """,
+                [id_gps, lat, lon, precision],
+            )
+            conn.commit()
+        else:
+            app.logger.warning("GPS ping ignorado: IMEI '%s' no encontrado en gps_imei", imei)
+
+        cur.close()
+        conn.close()
+    except Exception as e:
+        app.logger.error("Error PostgreSQL en /api/gps: %s", e)
+
+    try:
+        from datetime import datetime, timezone
+        db = get_mongo_db()
+        db.historial_gps.insert_one({
+            "imei":      imei,
+            "lat":       lat,
+            "lon":       lon,
+            "precision": precision,
+            "ts":        datetime.now(timezone.utc),
+        })
+    except Exception as e:
+        app.logger.error("Error MongoDB en /api/gps: %s", e)
+
+    return "", 200
+
+
+@app.route("/api/gps/posiciones", methods=["GET"])
+def api_gps_posiciones():
+    """Devuelve la última posición GPS de cada cuidador con dispositivo activo."""
+    if "user_id" not in session:
+        return jsonify({"error": "No autenticado"}), 401
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT ON (gi.id_cuidador)
+                   gi.id_cuidador,
+                   ug.latitud,
+                   ug.longitud,
+                   ug.timestamp_ubicacion,
+                   c.nombre || ' ' || c.apellido_p AS nombre
+            FROM   gps_imei gi
+            JOIN   ubicacion_gps ug ON ug.id_gps = gi.id_gps
+            JOIN   cuidador c ON c.id_cuidador = gi.id_cuidador
+            WHERE  gi.activo = TRUE
+            ORDER  BY gi.id_cuidador, ug.timestamp_ubicacion DESC
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        resultado = [
+            {
+                "id_cuidador": r[0],
+                "lat":         float(r[1]),
+                "lon":         float(r[2]),
+                "ts":          r[3].strftime("%H:%M:%S") if r[3] else "",
+                "nombre":      r[4] or "",
+            }
+            for r in rows
+        ]
+        return jsonify(resultado)
+    except Exception as e:
+        app.logger.error("Error en /api/gps/posiciones: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 # ─── Scheduler ──────────────────────────────────────────────────────────────
@@ -396,4 +544,4 @@ if __name__ == "__main__":
     if not scheduler.running:
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown())
-    app.run(debug=True, host="0.0.0.0", port=5001, use_reloader=False)
+    app.run(debug=True, host="0.0.0.0", port=5001)

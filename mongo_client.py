@@ -173,7 +173,7 @@ def registrar_log_nfc_fallido(pg_id_cuidador, nombre_cuidador,
 
 
 def agregar_ubicacion_gps(pg_id_paciente, pg_id_cuidador,
-                           nombre_paciente, latitud, longitud,
+                           nombre_cuidador, latitud, longitud,
                            precision_metros=None, en_domicilio=None):
     """
     Guarda una coordenada GPS del teléfono del cuidador en MongoDB.
@@ -187,7 +187,7 @@ def agregar_ubicacion_gps(pg_id_paciente, pg_id_cuidador,
             "pg_id_gps":       0,
             "pg_id_paciente":  pg_id_paciente,
             "pg_id_cuidador":  pg_id_cuidador,
-            "nombre_paciente": nombre_paciente,
+            "nombre_cuidador": nombre_cuidador if nombre_cuidador else "",
             "coordenadas": {
                 "latitud":          latitud,
                 "longitud":         longitud,
@@ -201,19 +201,95 @@ def agregar_ubicacion_gps(pg_id_paciente, pg_id_cuidador,
         pass  # MongoDB nunca interrumpe el flujo principal
 
 
-def get_trayecto_paciente(pg_id_paciente, horas=24):
+def get_trayecto_cuidador(pg_id_cuidador, horas=24):
     """
-    Retorna el trayecto GPS del paciente en las últimas N horas.
+    Retorna el trayecto GPS del cuidador en las últimas N horas.
     Solo disponible en MongoDB — PostgreSQL no guarda el historial.
     """
     try:
         db    = get_mongo_db()
         desde = datetime.now(timezone.utc) - timedelta(hours=horas)
         return list(db.ubicaciones_gps_hist.find(
-            {"pg_id_paciente": pg_id_paciente,
+            {"pg_id_cuidador": pg_id_cuidador,
              "timestamp": {"$gte": desde}},
             {"_id": 0, "coordenadas": 1, "timestamp": 1,
-             "en_domicilio": 1, "fuente": 1},
+             "en_domicilio": 1},
         ).sort("timestamp", 1))
+    except Exception:
+        return []
+
+
+def get_trayectos_todos_pacientes(pg_id_medico, horas=24):
+    """
+    Retorna trayectos GPS de los cuidadores agrupados por pg_id_cuidador.
+    pg_id_medico se acepta por firma pero la colección no filtra por médico.
+    """
+    try:
+        db    = get_mongo_db()
+        desde = datetime.now(timezone.utc) - timedelta(hours=horas)
+        cursor = db.ubicaciones_gps_hist.find(
+            {"timestamp": {"$gte": desde}},
+            {"_id": 0, "pg_id_cuidador": 1, "nombre_cuidador": 1,
+             "pg_id_paciente": 1, "coordenadas": 1,
+             "timestamp": 1, "en_domicilio": 1},
+        ).sort("timestamp", 1)
+
+        trayectos = {}
+        for punto in cursor:
+            id_cuid = punto["pg_id_cuidador"]
+            if id_cuid not in trayectos:
+                trayectos[id_cuid] = {
+                    "nombre": punto.get("nombre_cuidador", "Cuidador"),
+                    "puntos": [],
+                }
+            trayectos[id_cuid]["puntos"].append({
+                "lat":          punto["coordenadas"]["latitud"],
+                "lon":          punto["coordenadas"]["longitud"],
+                "timestamp":    punto["timestamp"].strftime("%Y-%m-%d %H:%M")
+                                if hasattr(punto["timestamp"], "strftime")
+                                else str(punto["timestamp"]),
+                "en_domicilio": punto.get("en_domicilio", None),
+            })
+        return trayectos
+    except Exception:
+        return {}
+
+
+def get_logs_acceso(limite=100):
+    """Últimos N intentos de login desde MongoDB."""
+    try:
+        db = get_mongo_db()
+        return list(db.logs_acceso.find(
+            {},
+            {"_id": 0, "pg_id_usuario": 1, "email": 1, "rol": 1,
+             "ip": 1, "exitoso": 1, "timestamp": 1,
+             "user_agent": 1, "motivo_fallo": 1}
+        ).sort("timestamp", -1).limit(limite))
+    except Exception:
+        return []
+
+
+def get_logs_sistema(limite=100):
+    """Últimos N logs del sistema desde MongoDB."""
+    try:
+        db = get_mongo_db()
+        return list(db.logs_sistema.find(
+            {},
+            {"_id": 0, "nivel": 1, "modulo": 1, "mensaje": 1,
+             "timestamp": 1, "detalle": 1, "traceback": 1}
+        ).sort("timestamp", -1).limit(limite))
+    except Exception:
+        return []
+
+
+def get_logs_nfc_fallidos(limite=100):
+    """Últimos N escaneos NFC fallidos desde MongoDB."""
+    try:
+        db = get_mongo_db()
+        return list(db.logs_nfc_fallidos.find(
+            {},
+            {"_id": 0, "pg_id_cuidador": 1, "nombre_cuidador": 1,
+             "uid_nfc": 1, "motivo": 1, "ip": 1, "timestamp": 1}
+        ).sort("timestamp", -1).limit(limite))
     except Exception:
         return []

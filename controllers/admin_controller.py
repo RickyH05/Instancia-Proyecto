@@ -225,7 +225,16 @@ def admin_pacientes():
             cur.close(); conn.close()
             flash(p_msg, "success" if p_ok == 1 else "danger")
         except Exception as e:
-            flash(f"Error: {e}", "danger")
+            conn.rollback()
+            error_msg = str(e)
+            if 'curp_check' in error_msg or 'curp' in error_msg.lower():
+                flash('El CURP ingresado no tiene el formato correcto. '
+                      'Debe tener exactamente 18 caracteres con el formato oficial mexicano. '
+                      'Ejemplo válido: GOMC900101HDFLRR09', 'danger')
+            elif 'unique' in error_msg.lower() or 'duplicate' in error_msg.lower():
+                flash('Ya existe un paciente registrado con ese CURP.', 'danger')
+            else:
+                flash(f'Error al guardar: {error_msg}', 'danger')
 
         return redirect(url_for("admin_pacientes"))
 
@@ -997,14 +1006,38 @@ def admin_auditoria():
     tabla  = request.args.get("tabla",  "") or None
     limite = request.args.get("limite", 200, type=int)
     rows   = []
+    usuarios_map = {}
     try:
         conn, cur = _admin_db()
         cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_lista_usuarios('cur_usr_audit')")
+        cur.execute("FETCH ALL FROM cur_usr_audit")
+        for u in cur.fetchall():
+            if u[0] and u[5]:
+                usuarios_map[u[0]] = u[5]
+        conn.commit()
+        cur.execute("BEGIN")
         cur.execute("CALL sp_rep_auditoria('cur_audit2', %s, %s)", [tabla, limite])
         cur.execute("FETCH ALL FROM cur_audit2")
-        rows = cur.fetchall()
+        raw = cur.fetchall()
         conn.commit()
         cur.close(); conn.close()
+        rows = [
+            {
+                "id":           r[0],
+                "tabla":        r[1],
+                "id_reg":       r[2],
+                "accion":       r[3],
+                "campo":        r[4],
+                "val_antes":    r[5],
+                "val_despues":  r[6],
+                "usuario_db":   r[7],
+                "id_usr_app":   r[8],
+                "ts":           r[9],
+                "nombre_usuario": usuarios_map.get(r[8], r[7] or "Sistema"),
+            }
+            for r in raw
+        ]
     except Exception as e:
         flash(f"Error al cargar auditoría: {e}", "danger")
     return render_template("admin/auditoria.html", rows=rows, tabla=tabla or "", limite=limite)

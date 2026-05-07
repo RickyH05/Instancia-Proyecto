@@ -51,7 +51,7 @@
         <label class="form-label">UID de la etiqueta <span style="color:#E74C3C;">*</span></label>
         <input type="text" name="uid_nfc" id="inp-uid" class="form-control"
           placeholder="Ej: NFC-RM-001" required style="font-family:monospace;">
-        <span style="font-size:12px;color:#9CA3AF;">Pulsa el botón para simular el escaneo o ingresa el UID manualmente.</span>
+        <span style="font-size:12px;color:#9CA3AF;">Acerca el teléfono o ingresa el UID manualmente.</span>
       </div>
 
       <div style="display:flex;gap:10px;margin-top:20px;">
@@ -83,21 +83,31 @@
 {% block scripts %}<script>
 lucide.createIcons();
 
-var _scanTimer = null;
-
-function iniciarScan() {
+async function iniciarScan() {
+  if (!('NDEFReader' in window)) {
+    mostrarToast('⚠ NFC no disponible — ingresa el UID manualmente');
+    return;
+  }
   document.getElementById('nfc-overlay').style.display = 'flex';
-  _scanTimer = setTimeout(function() {
-    var uids = ['NFC-RM-001','NFC-RM-002','NFC-RM-003','NFC-RM-004','NFC-RM-005'];
-    var uid  = uids[Math.floor(Math.random() * uids.length)];
+  try {
+    const reader = new NDEFReader();
+    await reader.scan();
+    reader.onreading = (event) => {
+      document.getElementById('nfc-overlay').style.display = 'none';
+      document.getElementById('inp-uid').value = event.serialNumber;
+      mostrarToast('✓ Etiqueta detectada: ' + event.serialNumber);
+    };
+    reader.onreadingerror = () => {
+      document.getElementById('nfc-overlay').style.display = 'none';
+      mostrarToast('✗ No se pudo leer la etiqueta');
+    };
+  } catch (err) {
     document.getElementById('nfc-overlay').style.display = 'none';
-    document.getElementById('inp-uid').value = uid;
-    mostrarToast('✓ Etiqueta detectada: ' + uid);
-  }, 2500);
+    mostrarToast('✗ Error NFC: ' + err.message);
+  }
 }
 
 function cancelarScan() {
-  clearTimeout(_scanTimer);
   document.getElementById('nfc-overlay').style.display = 'none';
 }
 

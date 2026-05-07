@@ -56,6 +56,7 @@
       <a href="{{ url_for('admin_reporte_tendencia_global') }}" class="nav-item"><i data-lucide="trending-up"    class="nav-icon"></i>Tendencia global</a>
       <div class="nav-label">Sistema</div>
       <a href="{{ url_for('admin_auditoria') }}"     class="nav-item"><i data-lucide="clipboard-list" class="nav-icon"></i>Auditoria</a>
+      <a href="{{ url_for('admin_logs_mongo') }}"   class="nav-item"><i data-lucide="database"       class="nav-icon"></i>Logs MongoDB</a>
       <a href="{{ url_for('admin_configuracion') }}" class="nav-item"><i data-lucide="settings"       class="nav-icon"></i>Configuracion</a>
     {% elif session.rol == 'medico' %}
       <a href="{{ url_for('doctor_dashboard') }}"  class="nav-item"><i data-lucide="home"           class="nav-icon"></i>Dashboard</a>

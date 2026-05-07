@@ -4,14 +4,14 @@
 {% block content %}
 
 <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
-  <input type="date" id="inp-fecha" class="form-control" style="max-width:180px;"
-    value="{{ fecha_seleccionada }}"
-    onchange="aplicarFiltros()"/>
-  <select id="sel-paciente" class="form-control" style="max-width:220px;"
-    onchange="aplicarFiltros()">
+  <input type="date" class="form-control" style="max-width:180px;"
+    value="{{ fecha_sel }}"
+    onchange="window.location='?fecha='+this.value+'&id_pac={{ id_pac_sel }}'"/>
+  <select class="form-control" style="max-width:220px;"
+    onchange="window.location='?fecha={{ fecha_sel }}&id_pac='+this.value">
     <option value="">Todos los pacientes</option>
-    {% for p in lista_pacientes %}
-    <option value="{{ p.id }}" {% if id_paciente_filtro == p.id %}selected{% endif %}>
+    {% for p in pacientes %}
+    <option value="{{ p.id }}" {% if id_pac_sel == p.id|string %}selected{% endif %}>
       {{ p.nombre }}
     </option>
     {% endfor %}

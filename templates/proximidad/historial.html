@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Historial de Proximidad{% endblock %}
 {% block page_title %}Historial de Proximidad{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
 {% block content %}
 <p style="font-size:14px;color:#5D6D7E;margin-bottom:20px;">
   Registro de eventos con validación de presencia GPS + Beacon BLE
@@ -64,7 +68,69 @@
     </table>
   </div>
 </div>
+<!-- ── Trayecto GPS desde MongoDB ─────────────────────────────────── -->
+<div class="card" style="margin-top:24px;padding:20px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+    <div>
+      <h3 style="font-size:15px;font-weight:600;color:#2C3E50;margin:0;">Trayecto GPS de Cuidadores — últimas {{ horas }}h</h3>
+      <span style="font-size:11px;color:#9CA3AF;">Fuente: MongoDB ubicaciones_gps_hist</span>
+    </div>
+    <div style="display:flex;gap:6px;">
+      {% for h in [6, 12, 24, 48] %}
+      <a href="?horas={{ h }}"
+         class="btn btn-sm {% if horas == h %}btn-primary{% else %}btn-ghost{% endif %}">
+        {{ h }}h
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  <div id="mapa-trayecto" style="height:450px;border-radius:8px;"></div>
+</div>
 {% endblock %}
-{% block scripts %}<script>lucide.createIcons();
+{% block scripts %}<script>
+lucide.createIcons();
 document.querySelectorAll('.pill').forEach(p=>{p.onclick=()=>{p.closest('.filter-pills').querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));p.classList.add('active');}});
+
+// ── Mapa Leaflet con trayectos de MongoDB ─────────────────────────
+const trayectos = {{ trayectos_json | safe }};
+const colores   = ['#2ecc71','#3498db','#e74c3c','#f39c12','#9b59b6'];
+const mapa      = L.map('mapa-trayecto').setView([25.7372, -100.3706], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+}).addTo(mapa);
+
+let colorIdx = 0;
+let bounds   = [];
+
+Object.entries(trayectos).forEach(([id_pac, datos]) => {
+    const color  = colores[colorIdx % colores.length];
+    colorIdx++;
+    const puntos = datos.puntos;
+    if (!puntos || puntos.length === 0) return;
+
+    const coordenadas = puntos.map(p => [p.lat, p.lon]);
+    L.polyline(coordenadas, { color: color, weight: 3 }).addTo(mapa);
+    coordenadas.forEach(c => bounds.push(c));
+
+    L.circleMarker([puntos[0].lat, puntos[0].lon], {
+        radius: 8, color: color, fillColor: color, fillOpacity: 1
+    }).bindPopup(
+        '<b>Cuidador: ' + datos.nombre + '</b><br>Inicio trayecto<br>' + puntos[0].timestamp
+    ).addTo(mapa);
+
+    const ultimo = puntos[puntos.length - 1];
+    L.marker([ultimo.lat, ultimo.lon]).bindPopup(
+        '<b>Cuidador: ' + datos.nombre + '</b><br>Ultima ubicacion<br>' +
+        ultimo.timestamp + '<br>En domicilio del paciente: ' +
+        (ultimo.en_domicilio ? 'Si' : 'No')
+    ).addTo(mapa);
+});
+
+if (bounds.length > 0) {
+    mapa.fitBounds(bounds);
+} else {
+    document.getElementById('mapa-trayecto').innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9CA3AF;font-size:14px;">' +
+        'Sin datos GPS en las últimas {{ horas }} horas</div>';
+}
 </script>{% endblock %}

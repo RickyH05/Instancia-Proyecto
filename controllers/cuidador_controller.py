@@ -97,13 +97,17 @@ def cuidador_home():
         flash(f"Error al cargar el dashboard: {e}", "danger")
         gps_resumen = None
 
-    lista_pacientes = list(pacientes.values())
+    lista_pacientes           = list(pacientes.values())
+    paciente_principal_id     = lista_pacientes[0]["id"]     if lista_pacientes else None
+    paciente_principal_nombre = lista_pacientes[0]["nombre"] if lista_pacientes else ""
     return render_template(
         "cuidador/home.html",
         pacientes=lista_pacientes,
         stats=stats,
         fecha_hoy=fecha_hoy,
         gps_resumen=gps_resumen,
+        paciente_principal_id=paciente_principal_id,
+        paciente_principal_nombre=paciente_principal_nombre,
     )
 
 
@@ -463,54 +467,61 @@ def cuidador_alerta_atender(id_alerta):
 @login_requerido
 @rol_requerido("cuidador")
 def cuidador_historial():
-    id_cuidador        = session["id_rol"]
-    eventos            = []
-    stats              = {"ok": 0, "omitidas": 0, "fuera": 0}
-    fecha_seleccionada = request.args.get("fecha") or str(date.today())
-    id_paciente_filtro = request.args.get("id_paciente", type=int)
-    total_omisiones    = 0
-    lista_pacientes    = []
+    id_cuidador     = session["id_rol"]
+    eventos         = []
+    stats           = {"ok": 0, "omitidas": 0, "fuera": 0}
+    fecha_sel       = request.args.get("fecha") or str(date.today())
+    id_pac          = request.args.get("id_pac", "")
+    total_omisiones = 0
+    pacientes       = []
     try:
         conn = get_db()
         cur  = conn.cursor()
+
+        # Lista de pacientes del cuidador (sin query directo)
         cur.execute("BEGIN")
-        cur.execute("CALL sp_rep_dashboard_cuidador('cur_dash', %s)", [id_cuidador])
-        cur.execute("FETCH ALL FROM cur_dash")
+        cur.execute("CALL sp_rep_dashboard_cuidador('cur_dash_h', %s)", [id_cuidador])
+        cur.execute("FETCH ALL FROM cur_dash_h")
         dashboard_rows = cur.fetchall()
         conn.commit()
-        id_pacientes    = list({r[1] for r in dashboard_rows})
-        pac_nombre      = {r[1]: r[2] for r in dashboard_rows}
-        lista_pacientes = [{"id": k, "nombre": v} for k, v in sorted(pac_nombre.items(), key=lambda x: x[1])]
+        pac_nombre = {r[1]: r[2] for r in dashboard_rows}
+        pacientes  = [{"id": k, "nombre": v} for k, v in sorted(pac_nombre.items(), key=lambda x: x[1])]
+        ids_todos  = list(pac_nombre.keys())
 
-        ids_a_consultar = [id_paciente_filtro] if id_paciente_filtro and id_paciente_filtro in id_pacientes else id_pacientes
-
-        historial_rows = []
-        for id_pac in ids_a_consultar:
-            cur_name = f"cur_hist_{id_pac}"
+        # Historial: uno o todos los pacientes
+        ids_a_consultar = [int(id_pac)] if id_pac and int(id_pac) in ids_todos else ids_todos
+        historial_rows  = []
+        for pid in ids_a_consultar:
+            cur_name = f"cur_hist_{pid}"
             cur.execute("BEGIN")
-            cur.execute(f"CALL sp_rep_historial_tomas('{cur_name}', %s, 14)", [id_pac])
+            cur.execute(f"CALL sp_rep_historial_tomas('{cur_name}', %s, 30)", [pid])
             cur.execute(f"FETCH ALL FROM {cur_name}")
             historial_rows.extend(cur.fetchall())
             conn.commit()
 
         for r in historial_rows:
+            if str(r[2])[:10] != fecha_sel:
+                continue
             eventos.append({
-                "id":             r[1],
-                "id_paciente":    r[0],
-                "pac":            pac_nombre.get(r[0], "—"),
-                "med":            r[9] or "—",
-                "resultado":      r[4] or "—",
-                "time":           str(r[2])[:16],
-                "orig":           "NFC" if (r[6] or "").lower() == "nfc" else "Manual",
-                "regla_aplicada": r[13] if len(r) > 13 else None,
+                "id":          r[1],
+                "id_paciente": r[0],
+                "pac":         pac_nombre.get(r[0], "—"),
+                "med":         r[9] or "—",
+                "resultado":   r[4] or "—",
+                "time":        str(r[2])[:16],
+                "orig":        "NFC" if (r[6] or "").lower() == "nfc" else "Manual",
             })
-        stats["ok"]    = sum(1 for e in eventos if e["regla_aplicada"] in ("TOMA_EXITOSA", "TOMA_TARDIA", "DUPLICADO_DETECTADO"))
-        stats["fuera"] = sum(1 for e in eventos if e["regla_aplicada"] == "SIN_AGENDA_ASOCIABLE")
 
+        # Bug 1 — contadores robustos
+        stats["ok"]       = sum(1 for e in eventos if (e["resultado"] or "").strip().lower() == "exitoso")
+        stats["fuera"]    = sum(1 for e in eventos if (e["resultado"] or "").strip().lower() in ("tardío", "tardio"))
+        stats["omitidas"] = sum(1 for e in eventos if (e["resultado"] or "").strip().lower() in ("omitido", "omisión", "omision"))
+
+        # Omisiones del día desde agenda
         cur.execute("BEGIN")
-        cur.execute("CALL sp_rep_agenda_dia_cuidador('cur_agenda', %s, %s)",
-                    [id_cuidador, fecha_seleccionada])
-        cur.execute("FETCH ALL FROM cur_agenda")
+        cur.execute("CALL sp_rep_agenda_dia_cuidador('cur_agenda_h', %s, %s)",
+                    [id_cuidador, fecha_sel])
+        cur.execute("FETCH ALL FROM cur_agenda_h")
         agendas = cur.fetchall()
         conn.commit()
         total_omisiones = sum(1 for a in agendas if a[3] == "omitida" and a[5] in ids_a_consultar)
@@ -518,26 +529,22 @@ def cuidador_historial():
         for a in agendas:
             if a[3] == "omitida" and a[5] in ids_a_consultar:
                 eventos.append({
-                    "id":             None,
-                    "id_paciente":    a[5],
-                    "pac":            a[6] or "—",
-                    "med":            a[7] or "—",
-                    "resultado":      "Omitido",
-                    "time":           str(a[2])[:16],
-                    "orig":           "—",
-                    "regla_aplicada": "OMITIDA",
+                    "id":          None,
+                    "id_paciente": a[5],
+                    "pac":         a[6] or "—",
+                    "med":         a[7] or "—",
+                    "resultado":   "Omitido",
+                    "time":        str(a[2])[:16],
+                    "orig":        "—",
                 })
 
         eventos.sort(key=lambda e: e["time"], reverse=True)
-
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar historial: {e}", "danger")
     return render_template("cuidador/historial_nfc.html",
                            eventos=eventos, stats=stats, omisiones=total_omisiones,
-                           fecha_seleccionada=fecha_seleccionada,
-                           lista_pacientes=lista_pacientes,
-                           id_paciente_filtro=id_paciente_filtro)
+                           fecha_sel=fecha_sel, pacientes=pacientes, id_pac_sel=id_pac)
 
 
 @login_requerido

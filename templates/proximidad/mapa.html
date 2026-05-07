@@ -7,7 +7,7 @@
 </div>
 
 {% set total_bec  = puntos | selectattr('beacon.lat') | list | length %}
-{% set con_gps    = puntos | selectattr('cuidadores') | list | length %}
+
 
 <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;">
   <!-- Mapa Leaflet -->
@@ -20,7 +20,13 @@
       </div>
     </div>
     <div class="card-body" style="padding:0 16px 16px;">
-      <div id="map" style="height:440px;border-radius:8px;"></div>
+      <div id="map" style="height:440px;border-radius:8px;position:relative;"></div>
+    <div id="gps-refresh-ts"
+         style="position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
+                background:rgba(255,255,255,.85);border-radius:4px;padding:2px 8px;
+                font-size:11px;color:#5D6D7E;z-index:1000;pointer-events:none;display:none;">
+      Actualizado: <span id="gps-ts-valor">--</span>
+    </div>
     </div>
   </div>
 
@@ -45,7 +51,7 @@
             </div>
             <span style="font-size:13px;color:#5D6D7E;">Con posición GPS</span>
           </div>
-          <span style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#1ABC9C;">{{ con_gps }}</span>
+          <span id="contador-gps" style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#1ABC9C;">{{ con_gps }}</span>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;background:#F4F6F8;">
           <div style="display:flex;align-items:center;gap:10px;">
@@ -102,6 +108,17 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
+// Índice de marcadores GPS por id_cuidador para actualización en vivo
+var marcadoresGPS = {};
+
+// Mapa de nombre de cuidador por id_cuidador (para popups al recibir datos nuevos)
+var nombreCuidador = {};
+puntos.forEach(function(p) {
+  (p.cuidadores || []).forEach(function(c) {
+    if (c.id_cuidador) nombreCuidador[c.id_cuidador] = c.nombre || 'Cuidador';
+  });
+});
+
 var bounds = [];
 puntos.forEach(function(p) {
   if (p.beacon && p.beacon.lat) {
@@ -115,12 +132,13 @@ puntos.forEach(function(p) {
     bounds.push([p.beacon.lat, p.beacon.lon]);
   }
   (p.cuidadores || []).forEach(function(c) {
-    if (c.gps && c.gps.lat) {
+    if (c.gps && c.gps.lat && !marcadoresGPS[c.id_cuidador]) {
       var gps = L.circleMarker([c.gps.lat, c.gps.lon], {
         radius: 7, color: '#1ABC9C', fillColor: '#1ABC9C', fillOpacity: 0.85, weight: 2
       }).addTo(map);
       gps.bindPopup('<b>' + (c.nombre || 'Cuidador') + '</b><br>Paciente: ' + p.paciente + '<br>' + (c.gps.ts || ''));
       bounds.push([c.gps.lat, c.gps.lon]);
+      marcadoresGPS[c.id_cuidador] = gps;
     }
   });
 });
@@ -129,5 +147,40 @@ if (bounds.length > 0) {
 } else {
   map.setView([25.6866, -100.3161], 12);
 }
+
+
+
+// Actualización en vivo cada 20 segundos
+function refrescarGPS() {
+  fetch('/api/gps/posiciones')
+    .then(function(r) { return r.json(); })
+    .then(function(lista) {
+      if (!Array.isArray(lista)) return;
+      lista.forEach(function(pos) {
+        var id     = pos.id_cuidador;
+        var latlng = [pos.lat, pos.lon];
+        // Actualizar diccionario de nombres con dato fresco del servidor
+        if (pos.nombre) nombreCuidador[id] = pos.nombre;
+        var nombre = nombreCuidador[id] || ('Cuidador #' + id);
+        var popup  = '<b>' + nombre + '</b><br>' + pos.ts;
+        if (marcadoresGPS[id]) {
+          marcadoresGPS[id].setLatLng(latlng);
+          marcadoresGPS[id].getPopup().setContent(popup);
+        } else {
+          var m = L.circleMarker(latlng, {
+            radius: 7, color: '#1ABC9C', fillColor: '#1ABC9C', fillOpacity: 0.85, weight: 2
+          }).addTo(map);
+          m.bindPopup(popup);
+          marcadoresGPS[id] = m;
+        }
+      });
+      var ahora = new Date().toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      document.getElementById('gps-ts-valor').textContent = ahora;
+      document.getElementById('gps-refresh-ts').style.display = 'block';
+    })
+    .catch(function(e) { console.warn('Error al refrescar GPS:', e); });
+}
+
+setInterval(refrescarGPS, 20000);
 </script>
 {% endblock %}

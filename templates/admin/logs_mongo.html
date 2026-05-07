@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Logs MongoDB{% endblock %}
+{% block page_title %}Logs del Sistema — MongoDB{% endblock %}
+{% block content %}
+
+<p style="font-size:13px;color:#9CA3AF;margin-bottom:20px;">
+  Fuente: MongoDB <code>medinfc_mongo</code>
+</p>
+
+<!-- Badges de totales -->
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;">
+  <span style="background:#2980B9;color:#fff;border-radius:20px;padding:4px 14px;font-size:13px;font-weight:600;">
+    Accesos: {{ total_acceso }}
+  </span>
+  <span style="background:#F39C12;color:#fff;border-radius:20px;padding:4px 14px;font-size:13px;font-weight:600;">
+    Sistema: {{ total_sistema }}
+  </span>
+  <span style="background:#E74C3C;color:#fff;border-radius:20px;padding:4px 14px;font-size:13px;font-weight:600;">
+    NFC Fallidos: {{ total_nfc }}
+  </span>
+</div>
+
+<!-- Tabs -->
+<div style="display:flex;gap:0;border-bottom:2px solid #E5E7EB;margin-bottom:20px;">
+  <button class="mongo-tab" data-target="panel-accesos"
+          style="padding:10px 20px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:#1B4F72;border-bottom:2px solid #1B4F72;margin-bottom:-2px;">
+    Accesos
+  </button>
+  <button class="mongo-tab" data-target="panel-sistema"
+          style="padding:10px 20px;border:none;background:none;cursor:pointer;font-size:14px;color:#5D6D7E;">
+    Sistema
+  </button>
+  <button class="mongo-tab" data-target="panel-nfc"
+          style="padding:10px 20px;border:none;background:none;cursor:pointer;font-size:14px;color:#5D6D7E;">
+    NFC Fallidos
+  </button>
+</div>
+
+<!-- Panel: Accesos -->
+<div id="panel-accesos" class="mongo-panel" style="display:block;">
+  {% if logs_acceso %}
+  <div class="card"><div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th><th>Email</th><th>Rol</th>
+          <th>IP</th><th>Resultado</th><th>User Agent</th><th>Motivo fallo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs_acceso %}
+        <tr>
+          <td style="font-size:12px;font-family:monospace;white-space:nowrap;">{{ log.timestamp }}</td>
+          <td style="font-size:13px;">{{ log.email or "—" }}</td>
+          <td style="font-size:12px;">{{ log.rol or "—" }}</td>
+          <td style="font-size:12px;font-family:monospace;">{{ log.ip or "—" }}</td>
+          <td>
+            {% if log.exitoso %}
+            <span class="badge badge-green">Exitoso</span>
+            {% else %}
+            <span class="badge badge-red">Fallido</span>
+            {% endif %}
+          </td>
+          <td style="font-size:11px;color:#9CA3AF;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+              title="{{ log.user_agent or '' }}">{{ (log.user_agent or "—")[:60] }}</td>
+          <td style="font-size:12px;color:#E74C3C;">{{ log.motivo_fallo or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% else %}
+  <p style="color:#9CA3AF;font-size:14px;text-align:center;padding:32px;">Sin registros en MongoDB para esta colección.</p>
+  {% endif %}
+</div>
+
+<!-- Panel: Sistema -->
+<div id="panel-sistema" class="mongo-panel" style="display:none;">
+  {% if logs_sistema %}
+  <div class="card"><div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th><th>Nivel</th><th>Módulo</th><th>Mensaje</th><th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs_sistema %}
+        <tr>
+          <td style="font-size:12px;font-family:monospace;white-space:nowrap;">{{ log.timestamp }}</td>
+          <td>
+            {% set niv = (log.nivel or "") | upper %}
+            {% if niv == "INFO" %}
+            <span class="badge" style="background:#2980B9;color:#fff;">INFO</span>
+            {% elif niv == "WARNING" %}
+            <span class="badge badge-yellow">WARNING</span>
+            {% elif niv == "ERROR" %}
+            <span class="badge badge-red">ERROR</span>
+            {% elif niv == "CRITICAL" %}
+            <span class="badge" style="background:#7B241C;color:#fff;">CRITICAL</span>
+            {% else %}
+            <span class="badge">{{ log.nivel or "—" }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;font-family:monospace;">{{ log.modulo or "—" }}</td>
+          <td style="font-size:13px;">{{ log.mensaje or "—" }}</td>
+          <td style="font-size:12px;color:#5D6D7E;max-width:280px;">
+            {% if log.detalle and log.detalle is mapping %}
+              {% for key, value in log.detalle.items() %}
+              <span style="display:inline-block;background:#F3F4F6;border:1px solid #E5E7EB;border-radius:4px;padding:1px 6px;margin:1px 2px 1px 0;font-size:11px;white-space:nowrap;">
+                {{ key }}: {{ value }}
+              </span>
+              {% endfor %}
+            {% elif log.detalle %}
+              {{ log.detalle }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% else %}
+  <p style="color:#9CA3AF;font-size:14px;text-align:center;padding:32px;">Sin registros en MongoDB para esta colección.</p>
+  {% endif %}
+</div>
+
+<!-- Panel: NFC Fallidos -->
+<div id="panel-nfc" class="mongo-panel" style="display:none;">
+  {% if logs_nfc %}
+  <div class="card"><div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th><th>Cuidador</th><th>UID NFC</th><th>Motivo</th><th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs_nfc %}
+        <tr>
+          <td style="font-size:12px;font-family:monospace;white-space:nowrap;">{{ log.timestamp }}</td>
+          <td style="font-size:13px;">{{ log.nombre_cuidador or "—" }}</td>
+          <td style="font-family:monospace;font-size:12px;">{{ log.uid_nfc or "—" }}</td>
+          <td>
+            <span class="badge" style="background:#E67E22;color:#fff;">{{ log.motivo or "—" }}</span>
+          </td>
+          <td style="font-size:12px;font-family:monospace;">{{ log.ip or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% else %}
+  <p style="color:#9CA3AF;font-size:14px;text-align:center;padding:32px;">Sin registros en MongoDB para esta colección.</p>
+  {% endif %}
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+lucide.createIcons();
+document.addEventListener('DOMContentLoaded', function() {
+    var tabs   = document.querySelectorAll('.mongo-tab');
+    var panels = document.querySelectorAll('.mongo-panel');
+
+    function activarTab(tabEl) {
+        tabs.forEach(function(t) {
+            t.style.color        = '#5D6D7E';
+            t.style.borderBottom = 'none';
+        });
+        panels.forEach(function(p) { p.style.display = 'none'; });
+        tabEl.style.color        = '#1B4F72';
+        tabEl.style.borderBottom = '2px solid #1B4F72';
+        var target = document.getElementById(tabEl.dataset.target);
+        if (target) target.style.display = 'block';
+    }
+
+    if (tabs.length > 0) activarTab(tabs[0]);
+
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() { activarTab(this); });
+    });
+});
+</script>
+{% endblock %}
