@@ -129,11 +129,9 @@
               <div class="form-group" style="margin:0;">
                 <label class="form-label" style="font-size:11px;">Unidad</label>
                 <select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">
-                  <option value="1" selected>mg</option>
-                  <option value="2">ml</option>
-                  <option value="3">mcg</option>
-                  <option value="4">UI</option>
-                  <option value="5">comp</option>
+                  {% for u in unidades %}
+                  <option value="{{ u[0] }}"{% if loop.first %} selected{% endif %}>{{ u[1] }} — {{ u[2] }}</option>
+                  {% endfor %}
                 </select>
               </div>
               <div class="form-group" style="margin:0;">
@@ -147,10 +145,6 @@
               <div class="form-group" style="margin:0;">
                 <label class="form-label" style="font-size:11px;">1ª toma</label>
                 <input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/>
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label class="form-label" style="font-size:11px;">UID NFC</label>
-                <input class="form-control" name="nfc_uids[]" type="text" placeholder="Ej: A1:B2:C3:D4" style="height:38px;font-size:13px;"/>
               </div>
               <button onclick="this.closest('.med-row').remove()" type="button"
                 style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
@@ -184,35 +178,43 @@ function updateDosisMax(sel) {
 }
 
 function addMedRec() {
-  var list    = document.getElementById('meds-list-rec');
-  var srcSel  = list.querySelector('select[name="med_id[]"]');
-  var opts    = '';
-  if (srcSel) {
-    Array.from(srcSel.options).forEach(function(o) {
-      opts += '<option value="' + o.value + '" data-dosis-max="' + (o.getAttribute('data-dosis-max') || '') + '">' + o.text + '</option>';
+  var list = document.getElementById('meds-list-rec');
+
+  // Clonar opciones de medicamento desde la primera fila
+  var srcMed  = list.querySelector('select[name="med_id[]"]');
+  var medOpts = '';
+  if (srcMed) {
+    Array.from(srcMed.options).forEach(function(o) {
+      medOpts += '<option value="' + o.value + '" data-dosis-max="' + (o.getAttribute('data-dosis-max') || '') + '">' + o.text + '</option>';
     });
   }
+
+  // Clonar opciones de unidad desde la primera fila
+  var srcUni  = list.querySelector('select[name="unidad[]"]');
+  var uniOpts = '';
+  if (srcUni) {
+    Array.from(srcUni.options).forEach(function(o, i) {
+      uniOpts += '<option value="' + o.value + '"' + (i === 0 ? ' selected' : '') + '>' + o.text + '</option>';
+    });
+  }
+
   var div = document.createElement('div');
   div.className = 'med-row';
   div.style.cssText = 'border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:10px;';
   div.innerHTML = '<div style="display:grid;grid-template-columns:2fr 80px 100px 70px 70px 80px 130px auto;gap:8px;align-items:end;">'
     + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Medicamento *</label>'
-    + '<select class="form-control" name="med_id[]" style="height:38px;font-size:13px;" required onchange="updateDosisMax(this)">' + opts + '</select></div>'
+    + '<select class="form-control" name="med_id[]" style="height:38px;font-size:13px;" required onchange="updateDosisMax(this)">' + medOpts + '</select></div>'
     + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Dosis</label>'
     + '<input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/>'
     + '<small class="dosis-max-hint" style="font-size:10px;color:#9CA3AF;"></small></div>'
     + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Unidad</label>'
-    + '<select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">'
-    + '<option value="1" selected>mg</option><option value="2">ml</option><option value="3">mcg</option><option value="4">UI</option><option value="5">comp</option>'
-    + '</select></div>'
+    + '<select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">' + uniOpts + '</select></div>'
     + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Frec. (h)</label>'
     + '<input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/></div>'
     + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Tol. (min)</label>'
     + '<input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/></div>'
     + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">1ª toma</label>'
     + '<input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/></div>'
-    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">UID NFC</label>'
-    + '<input class="form-control" name="nfc_uids[]" type="text" placeholder="Ej: A1:B2:C3:D4" style="height:38px;font-size:13px;"/></div>'
     + '<button onclick="this.closest(\'.med-row\').remove()" type="button"'
     + ' style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">'
     + '<i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>'

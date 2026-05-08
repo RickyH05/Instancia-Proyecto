@@ -106,13 +106,32 @@
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;">
         {% for m in rx.meds %}
-        <div style="background:#F4F6F8;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;gap:16px;flex-wrap:wrap;">
+        {% set uid = etiquetas_nfc.get(m.id_rm) %}
+        <div style="background:#F4F6F8;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
           <strong style="color:#2C3E50;">{{ m.nombre }} {{ m.dosis }}{{ m.unidad }}</strong>
           <span style="color:#5D6D7E;">Cada {{ m.frecuencia_h }}h</span>
           <span style="color:#5D6D7E;display:flex;align-items:center;gap:3px;">
             <i data-lucide="clock" style="width:11px;height:11px;"></i> {{ m.hora }}
           </span>
           <span style="color:#5D6D7E;">Tolerancia: {{ m.tolerancia }} min</span>
+          {% if uid %}
+          <span style="font-size:11px;background:rgba(26,188,156,.12);color:#0F6E56;padding:2px 8px;border-radius:12px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+            <i data-lucide="wifi" style="width:11px;height:11px;"></i> NFC activo
+          </span>
+          <form method="POST"
+            action="{{ url_for('doctor_nfc_desactivar', id_pac=id, uid=uid) }}"
+            style="display:inline;"
+            onsubmit="return confirm('¿Desactivar NFC {{ uid }}?')">
+            <button type="submit" class="btn btn-ghost btn-sm"
+              style="color:#E74C3C;font-size:11px;padding:2px 6px;">
+              <i data-lucide="unlink" style="width:11px;height:11px;"></i> Desvincular
+            </button>
+          </form>
+          {% else %}
+          <span style="font-size:11px;color:#9CA3AF;display:inline-flex;align-items:center;gap:3px;">
+            <i data-lucide="wifi-off" style="width:11px;height:11px;"></i> Sin NFC
+          </span>
+          {% endif %}
         </div>
         {% endfor %}
       </div>
@@ -336,11 +355,15 @@
           </div>
           <div id="meds-list-perfil">
             <div class="med-row" style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:8px;">
-              <div style="display:grid;grid-template-columns:1fr 80px 80px 80px 80px 80px auto;gap:8px;align-items:end;">
+              <div style="display:grid;grid-template-columns:2fr 80px 110px 80px 80px 80px auto;gap:8px;align-items:end;">
                 <div class="form-group" style="margin:0;">
-                  <label class="form-label" style="font-size:11px;">ID Medicamento *</label>
-                  <input class="form-control" name="med_id[]" type="number" min="1"
-                    placeholder="ID" style="height:38px;font-size:13px;" required/>
+                  <label class="form-label" style="font-size:11px;">Medicamento *</label>
+                  <select class="form-control" name="med_id[]" style="height:38px;font-size:13px;" required>
+                    <option value="">— Seleccionar —</option>
+                    {% for m in medicamentos_cat %}
+                    <option value="{{ m[0] }}">{{ m[1] }}</option>
+                    {% endfor %}
+                  </select>
                 </div>
                 <div class="form-group" style="margin:0;">
                   <label class="form-label" style="font-size:11px;">Dosis</label>
@@ -348,9 +371,12 @@
                     value="500" style="height:38px;font-size:13px;"/>
                 </div>
                 <div class="form-group" style="margin:0;">
-                  <label class="form-label" style="font-size:11px;">Unidad ID</label>
-                  <input class="form-control" name="unidad[]" type="number" min="1"
-                    value="1" style="height:38px;font-size:13px;"/>
+                  <label class="form-label" style="font-size:11px;">Unidad</label>
+                  <select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">
+                    {% for u in unidades_cat %}
+                    <option value="{{ u[0] }}"{% if loop.first %} selected{% endif %}>{{ u[1] }} — {{ u[2] }}</option>
+                    {% endfor %}
+                  </select>
                 </div>
                 <div class="form-group" style="margin:0;">
                   <label class="form-label" style="font-size:11px;">Frec. (h)</label>
@@ -440,28 +466,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function addMedPerfil() {
   var list = document.getElementById('meds-list-perfil');
+
+  // Clonar opciones desde la primera fila del DOM
+  var srcMed  = list.querySelector('select[name="med_id[]"]');
+  var medOpts = '';
+  if (srcMed) {
+    Array.from(srcMed.options).forEach(function(o) {
+      medOpts += '<option value="' + o.value + '">' + o.text + '</option>';
+    });
+  }
+  var srcUni  = list.querySelector('select[name="unidad[]"]');
+  var uniOpts = '';
+  if (srcUni) {
+    Array.from(srcUni.options).forEach(function(o, i) {
+      uniOpts += '<option value="' + o.value + '"' + (i === 0 ? ' selected' : '') + '>' + o.text + '</option>';
+    });
+  }
+
   var div = document.createElement('div');
   div.className = 'med-row';
   div.style.cssText = 'border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:8px;';
-  div.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 80px 80px 80px 80px 80px auto;gap:8px;align-items:end;">
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">ID Medicamento *</label>
-        <input class="form-control" name="med_id[]" type="number" min="1" placeholder="ID" style="height:38px;font-size:13px;" required/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Dosis</label>
-        <input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Unidad ID</label>
-        <input class="form-control" name="unidad[]" type="number" min="1" value="1" style="height:38px;font-size:13px;"/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Frec. (h)</label>
-        <input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Tol. (min)</label>
-        <input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/></div>
-      <div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">1ª toma</label>
-        <input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/></div>
-      <button onclick="this.closest('.med-row').remove()" type="button"
-        style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
-        <i data-lucide="trash-2" style="width:15px;height:15px;"></i>
-      </button>
-    </div>`;
+  div.innerHTML = '<div style="display:grid;grid-template-columns:2fr 80px 110px 80px 80px 80px auto;gap:8px;align-items:end;">'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Medicamento *</label>'
+    + '<select class="form-control" name="med_id[]" style="height:38px;font-size:13px;" required>' + medOpts + '</select></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Dosis</label>'
+    + '<input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Unidad</label>'
+    + '<select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">' + uniOpts + '</select></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Frec. (h)</label>'
+    + '<input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Tol. (min)</label>'
+    + '<input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">1ª toma</label>'
+    + '<input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/></div>'
+    + '<button onclick="this.closest(\'.med-row\').remove()" type="button"'
+    + ' style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">'
+    + '<i data-lucide="trash-2" style="width:15px;height:15px;"></i></button>'
+    + '</div>';
   list.appendChild(div);
   lucide.createIcons();
 }

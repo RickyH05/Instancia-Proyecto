@@ -1,12 +1,11 @@
 import json
-from datetime import date
+from datetime import date, datetime
 
 from flask import flash, redirect, render_template, request, session, url_for
 
 from config import get_db
 from mongo_client import (
     agregar_ubicacion_gps,
-    get_historial_paciente,
     registrar_log_nfc_fallido,
     registrar_log_sistema,
 )
@@ -65,14 +64,64 @@ def cuidador_home():
         stats["alertas_pend"] = row_al[0] if row_al else 0
         conn.commit()
 
-        if pacientes:
+        # ── Fotos de pacientes ──────────────────────────────────────────────
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_pacientes_cuidador('cur_pac_cuid_home', %s)", [id_cuidador])
+        cur.execute("FETCH ALL FROM cur_pac_cuid_home")
+        vinculos_home = cur.fetchall()
+        conn.commit()
+        # cols: id_paciente_cuidador[0], id_cuidador[1], id_paciente[2],
+        #       paciente_nombre[3], nombre[4], apellido_p[5], apellido_m[6],
+        #       fecha_nacimiento[7], foto_perfil[8], paciente_activo[9],
+        #       es_principal[10], vinculo_activo[11]
+        vinculo_por_paciente = {v[2]: v for v in vinculos_home}
+        for v in vinculos_home:
+            pid = v[2]
+            if pid in pacientes:
+                pacientes[pid]["foto"] = v[8] or ""
+
+        # ── Badges de turno ─────────────────────────────────────────────────
+        DIAS_ES  = {0:"lunes",1:"martes",2:"miercoles",3:"jueves",4:"viernes",5:"sabado",6:"domingo"}
+        dia_hoy  = DIAS_ES[date.today().weekday()]
+        hora_now = datetime.now().time()
+
+        for pid, p in pacientes.items():
+            v = vinculo_por_paciente.get(pid)
+            if not v:
+                p["turno_estado"] = "sin_turno"
+                p["turno_hora"]   = None
+                continue
+
+            id_pc = v[0]
+            cur.execute("BEGIN")
             cur.execute(
-                "SELECT id_paciente, foto_perfil FROM paciente WHERE id_paciente = ANY(%s)",
-                [list(pacientes.keys())],
+                f"CALL sp_gestion_horario('L', NULL, NULL, NULL, 'cur_hor_{pid}', %s)", [id_pc]
             )
-            for pid, fp in cur.fetchall():
-                if pid in pacientes:
-                    pacientes[pid]["foto"] = fp or ""
+            cur.fetchone()
+            cur.execute(f"FETCH ALL FROM cur_hor_{pid}")
+            turnos = cur.fetchall()
+            conn.commit()
+            # cols: id_cuidador_horario[0], dia_semana[1], hora_inicio[2],
+            #       hora_fin[3], cuidador[4], paciente[5]
+
+            turno_estado = "sin_turno"
+            turno_hora   = None
+            turnos_hoy   = [t for t in turnos if t[1] == dia_hoy]
+            for t in turnos_hoy:
+                h_ini = t[2]
+                h_fin = t[3]
+                if h_ini <= hora_now <= h_fin:
+                    turno_estado = "en_turno"
+                    break
+                elif hora_now < h_ini:
+                    if turno_hora is None or h_ini < turno_hora:
+                        turno_hora = h_ini
+
+            if turno_estado != "en_turno":
+                turno_estado = "proximo" if turno_hora else ("fuera_turno" if turnos_hoy else "sin_turno")
+
+            p["turno_estado"] = turno_estado
+            p["turno_hora"]   = turno_hora.strftime("%H:%M") if turno_hora else None
 
         gps_resumen = None
         cur.execute("BEGIN")
@@ -108,6 +157,66 @@ def cuidador_home():
         gps_resumen=gps_resumen,
         paciente_principal_id=paciente_principal_id,
         paciente_principal_nombre=paciente_principal_nombre,
+    )
+
+
+@login_requerido
+@rol_requerido("cuidador")
+def cuidador_horario():
+    id_cuidador = session["id_rol"]
+    ORDEN_DIAS  = ["lunes","martes","miercoles","jueves","viernes","sabado","domingo"]
+    DIAS_ES     = {0:"lunes",1:"martes",2:"miercoles",3:"jueves",4:"viernes",5:"sabado",6:"domingo"}
+    dia_hoy     = DIAS_ES[date.today().weekday()]
+    semana      = {dia: [] for dia in ORDEN_DIAS}
+
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_pacientes_cuidador('cur_pac_hor', %s)", [id_cuidador])
+        cur.execute("FETCH ALL FROM cur_pac_hor")
+        vinculos = cur.fetchall()
+        conn.commit()
+
+        for v in vinculos:
+            id_pc = v[0]
+            cur.execute("BEGIN")
+            cur.execute(
+                f"CALL sp_gestion_horario('L', NULL, NULL, NULL, 'cur_sem_{id_pc}', %s)", [id_pc]
+            )
+            cur.fetchone()
+            cur.execute(f"FETCH ALL FROM cur_sem_{id_pc}")
+            turnos_pac = cur.fetchall()
+            conn.commit()
+
+            for turno in turnos_pac:
+                dia = turno[1]
+                if dia not in semana:
+                    continue
+                semana[dia].append({
+                    "paciente":     v[3],
+                    "id_paciente":  v[2],
+                    "foto_perfil":  v[8],
+                    "hora_ini":     turno[2].strftime("%H:%M"),
+                    "hora_fin":     turno[3].strftime("%H:%M"),
+                    "es_principal": v[10],
+                })
+
+        for dia in ORDEN_DIAS:
+            semana[dia].sort(key=lambda x: x["hora_ini"])
+
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        flash(f"Error al cargar el horario: {e}", "danger")
+
+    return render_template(
+        "cuidador/horario.html",
+        semana=semana,
+        ORDEN_DIAS=ORDEN_DIAS,
+        dia_hoy=dia_hoy,
     )
 
 
@@ -629,67 +738,47 @@ def cuidador_mi_gps():
 @rol_requerido("cuidador")
 def cuidador_grafica_adherencia():
     id_cuidador     = session["id_rol"]
+    nombre_cuidador = session["nombre"]
     dias            = request.args.get("dias", 7, type=int)
     if not dias or dias <= 0:
         dias = 7
-    pacientes_datos = {}
 
-    # ── Obtener qué pacientes tiene este cuidador — PostgreSQL ───────────────
-    ids_paciente = []
-    pac_nombre   = {}
+    puntos = []
     try:
         conn = get_db()
         cur  = conn.cursor()
         cur.execute("BEGIN")
-        cur.execute("CALL sp_rep_dashboard_cuidador('cur_dash_ga', %s)", [id_cuidador])
-        cur.execute("FETCH ALL FROM cur_dash_ga")
-        rows_dash = cur.fetchall()
+        cur.execute(
+            "CALL sp_rep_grafica_tomas_cuidador('cur_graf_cuid', %s, %s)",
+            [id_cuidador, dias],
+        )
+        cur.execute("FETCH ALL FROM cur_graf_cuid")
+        rows = cur.fetchall()
         conn.commit()
         cur.close(); conn.close()
-        # cols: 0=id_cuidador, 1=id_paciente, 2=paciente, ...
-        for r in rows_dash:
-            pid = r[1]; nom = r[2]
-            if pid and pid not in pac_nombre:
-                pac_nombre[pid] = nom
-        ids_paciente = list(pac_nombre.keys())
-    except Exception as e:
-        flash(f"Error al cargar datos del cuidador: {e}", "danger")
-
-    # ── Historial desde MongoDB ──────────────────────────────────────────────
-    # Construir lista JSON-serializable con string keys para el template
-    series_json = []   # [{nombre, datos:[{fecha,correctas,fuera_horario,no_tomadas,pendientes}]}]
-    for id_pac in ids_paciente:
-        try:
-            docs   = get_historial_paciente(id_pac, dias=dias)
-            puntos = []
-            for doc in docs:
-                m = doc.get("metricas", {})
-                puntos.append({
-                    "fecha":         str(doc["fecha"])[:10],
-                    "correctas":     int(m.get("correctas",  0)),
-                    "fuera_horario": int(m.get("tardias",    0)),
-                    "no_tomadas":    int(m.get("omitidas",   0)),
-                    "pendientes":    int(m.get("pendientes", 0)),
-                    "total":         int(m.get("total",      0)),
-                })
-            series_json.append({
-                "id_paciente": id_pac,
-                "nombre":      pac_nombre.get(id_pac, str(id_pac)),
-                "datos":       puntos,
+        # cols: id_cuidador[0], fecha[1], total[2], correctas[3],
+        #       fuera_horario[4], no_tomadas[5], pendientes[6]
+        for r in rows:
+            puntos.append({
+                "fecha":         str(r[1])[:10],
+                "total":         int(r[2] or 0),
+                "correctas":     int(r[3] or 0),
+                "fuera_horario": int(r[4] or 0),
+                "no_tomadas":    int(r[5] or 0),
+                "pendientes":    int(r[6] or 0),
             })
-            # mantener pacientes_datos para la lógica del template (un solo / múltiples)
-            pacientes_datos[id_pac] = {"nombre": pac_nombre.get(id_pac, str(id_pac)), "datos": puntos}
-        except Exception as e:
-            registrar_log_sistema(
-                "ERROR", "cuidador_grafica_adherencia",
-                f"Fallo MongoDB historial paciente {id_pac}", str(e)
-            )
-            pacientes_datos[id_pac] = {"nombre": pac_nombre.get(id_pac, str(id_pac)), "datos": []}
-            series_json.append({"id_paciente": id_pac,
-                                 "nombre": pac_nombre.get(id_pac, str(id_pac)),
-                                 "datos": []})
+    except Exception as e:
+        flash(f"Error al cargar la gráfica: {e}", "danger")
 
-    return render_template("cuidador/grafica_adherencia.html",
-                           pacientes_datos=pacientes_datos,
-                           series_json=json.dumps(series_json, ensure_ascii=False),
-                           dias=dias)
+    series_json = json.dumps(
+        [{"nombre": nombre_cuidador, "datos": puntos}],
+        ensure_ascii=False,
+    )
+
+    return render_template(
+        "cuidador/grafica_adherencia.html",
+        series_json=series_json,
+        nombre_cuidador=nombre_cuidador,
+        dias=dias,
+        tiene_datos=bool(puntos),
+    )

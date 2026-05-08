@@ -246,6 +246,10 @@ def doctor_paciente_nuevo():
 def doctor_paciente_perfil(id):
     return doctor.doctor_paciente_perfil(id)
 
+@app.route("/doctor/pacientes/<int:id_pac>/nfc/<string:uid>/desactivar", methods=["POST"])
+def doctor_nfc_desactivar(id_pac, uid):
+    return doctor.doctor_nfc_desactivar(id_pac, uid)
+
 @app.route("/medico/paciente/<int:id_pac>/asignar-diagnostico", methods=["POST"])
 def medico_asignar_diagnostico(id_pac):
     return doctor.medico_asignar_diagnostico(id_pac)
@@ -344,6 +348,10 @@ def doctor_riesgo_omision():
 @app.route("/cuidador")
 def cuidador_home():
     return cuidador.cuidador_home()
+
+@app.route("/cuidador/horario")
+def cuidador_horario():
+    return cuidador.cuidador_horario()
 
 @app.route("/cuidador/paciente/<int:id>")
 def cuidador_paciente(id):

@@ -90,6 +90,17 @@
         <span style="margin-left:auto;font-size:16px;">🟢</span>
         {% endif %}
       </div>
+      <div style="margin-bottom:6px;">
+        {% if p.turno_estado == 'en_turno' %}
+        <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(26,188,156,.15);color:#1ABC9C;">● En turno</span>
+        {% elif p.turno_estado == 'proximo' %}
+        <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(243,156,18,.15);color:#F39C12;">◑ Próximo · {{ p.turno_hora }}</span>
+        {% elif p.turno_estado == 'fuera_turno' %}
+        <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(156,163,175,.15);color:#9CA3AF;">○ Fuera de turno</span>
+        {% else %}
+        <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(156,163,175,.10);color:#C0C8D2;">— Sin turno hoy</span>
+        {% endif %}
+      </div>
       <div style="font-size:12px;color:#5D6D7E;margin-bottom:8px;">
         {{ p.meds }} medicamentos{% if p.next %} · Próxima: {{ p.next }}{% endif %}
       </div>

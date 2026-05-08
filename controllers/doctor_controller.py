@@ -296,7 +296,7 @@ def doctor_paciente_perfil(id):
                 }
             if id_rxm:
                 recetas[id_rx]["meds"].append({
-                    "nombre": med_nom, "dosis": dosis, "unidad": unidad,
+                    "id_rm": id_rxm, "nombre": med_nom, "dosis": dosis, "unidad": unidad,
                     "frecuencia_h": freq, "tolerancia": tol, "hora": hora,
                 })
 
@@ -338,7 +338,44 @@ def doctor_paciente_perfil(id):
         conn.close()
 
     except Exception as e:
+        import traceback as _tb; _tb.print_exc()
         flash(f"Error al cargar el perfil: {e}", "danger")
+
+    print(f"DEBUG recetas count={len(recetas)}")
+    print(f"DEBUG recetas keys={list(recetas.keys())}")
+    for _rx_id, _rx in recetas.items():
+        print(f"  receta id={_rx_id} meds={[m.get('id_rm') for m in _rx.get('meds', [])]}")
+
+    # ── Etiquetas NFC por id_receta_medicamento ──────────────────────────────
+    import traceback as _tb
+    etiquetas_nfc = {}  # {id_rm: uid_nfc}
+    ids_rm_vistos = set()
+    for rx in recetas.values():
+        for m in rx.get("meds", []):
+            id_rm = m.get("id_rm")
+            if not id_rm or id_rm in ids_rm_vistos:
+                continue
+            ids_rm_vistos.add(id_rm)
+            try:
+                conn_et = get_db()
+                cur_et  = conn_et.cursor()
+                cur_et.execute("BEGIN")
+                cur_et.execute(
+                    "CALL sp_gestion_etiqueta_nfc('L', NULL, NULL, NULL, 'cur_et', NULL, NULL, %s)",
+                    [id_rm],
+                )
+                cur_et.fetchone()  # consume INOUT/OUT params (p_uid, p_ok, p_msg)
+                cur_et.execute("FETCH ALL FROM cur_et")
+                rows_et = cur_et.fetchall()
+                conn_et.commit()
+                cur_et.close(); conn_et.close()
+                print(f"DEBUG NFC id_rm={id_rm} rows_et={rows_et}")
+                activas = [r for r in rows_et if r[4] == 'activo']
+                if activas:
+                    etiquetas_nfc[int(id_rm)] = activas[0][0]
+            except Exception:
+                _tb.print_exc()
+    print(f"DEBUG etiquetas_nfc final={etiquetas_nfc}")
 
     # ── Gauge de adherencia — MongoDB ────────────────────────────────────────
     try:
@@ -347,6 +384,27 @@ def doctor_paciente_perfil(id):
         registrar_log_sistema("ERROR", "doctor_paciente_perfil",
                               f"Fallo MongoDB pct paciente {id}", str(e))
         pct_mongo = 0.0
+
+    # ── Catálogos para modal nueva receta ────────────────────────────────────
+    medicamentos_cat = []
+    unidades_cat     = []
+    try:
+        conn2 = get_db()
+        cur2  = conn2.cursor()
+        cur2.execute("BEGIN")
+        cur2.execute("CALL sp_gestion_medicamento('L', NULL, NULL, NULL, 'cur_med_cat_perf')")
+        cur2.fetchone()
+        cur2.execute("FETCH ALL FROM cur_med_cat_perf")
+        medicamentos_cat = cur2.fetchall()
+        conn2.commit()
+        cur2.execute("BEGIN")
+        cur2.execute("CALL sp_rep_unidades_dosis('cur_uni_cat_perf')")
+        cur2.execute("FETCH ALL FROM cur_uni_cat_perf")
+        unidades_cat = cur2.fetchall()
+        conn2.commit()
+        cur2.close(); conn2.close()
+    except Exception:
+        pass
 
     return render_template(
         "doctor/paciente_perfil.html",
@@ -360,6 +418,9 @@ def doctor_paciente_perfil(id):
         pct_mongo=pct_mongo,
         observaciones_atendidas=observaciones_atendidas,
         solo_pend_alertas=solo_pend_alertas,
+        medicamentos_cat=medicamentos_cat,
+        unidades_cat=unidades_cat,
+        etiquetas_nfc=etiquetas_nfc,
     )
 
 
@@ -481,18 +542,28 @@ def doctor_receta_crear(id):
                 hora   = hora_lst[i]
                 unidad = int(unidad_lst[i])
             except (IndexError, ValueError):
+                flash(f"Medicamento {i+1}: datos incompletos.", "warning")
                 continue
 
             cur_rxmed = f"cur_rxmed_{i}"
-            cur.execute("BEGIN")
-            cur.execute(
-                f"CALL sp_agregar_receta_med(NULL, NULL, NULL, '{cur_rxmed}', %s, %s, %s, %s, %s, %s, %s)",
-                [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
-            )
-            _, p_ok_m, p_msg_m, _ = cur.fetchone()
-            conn.commit()
-            if p_ok_m != 1:
-                flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
+            try:
+                cur.execute("BEGIN")
+                cur.execute(
+                    f"CALL sp_agregar_receta_med(NULL, NULL, NULL, '{cur_rxmed}', %s, %s, %s, %s, %s, %s, %s)",
+                    [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
+                )
+                row_m  = cur.fetchone()
+                p_ok_m = row_m[1] if row_m else -99
+                p_msg_m = row_m[2] if row_m else "Sin respuesta del SP"
+                cur.execute(f"FETCH ALL FROM {cur_rxmed}")
+                if p_ok_m != 1:
+                    conn.rollback()
+                    flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
+                else:
+                    conn.commit()
+            except Exception as em:
+                conn.rollback()
+                flash(f"Medicamento {i+1}: {em}", "warning")
 
         cur.close()
         conn.close()
@@ -502,6 +573,35 @@ def doctor_receta_crear(id):
         flash(f"Error al crear la receta: {e}", "danger")
 
     return redirect(url_for("doctor_paciente_perfil", id=id))
+
+
+@login_requerido
+@rol_requerido("medico")
+def doctor_nfc_desactivar(id_pac, uid):
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("BEGIN")
+        cur.execute("""
+            CALL sp_gestion_etiqueta_nfc(
+                'U', %s, NULL, NULL, 'cur_nfc_desact',
+                NULL, NULL, NULL, 'inactivo'
+            )
+        """, [uid])
+        row    = cur.fetchone()
+        p_ok   = row[1] if row else -99
+        p_msg  = row[2] if row else "Sin respuesta del SP"
+        cur.execute("FETCH ALL FROM cur_nfc_desact")
+        if p_ok != 1:
+            conn.rollback()
+            flash(p_msg, "danger")
+        else:
+            conn.commit()
+            flash("Etiqueta NFC desactivada.", "success")
+        cur.close(); conn.close()
+    except Exception as e:
+        flash(str(e), "danger")
+    return redirect(url_for("doctor_paciente_perfil", id=id_pac))
 
 
 @login_requerido
@@ -869,6 +969,38 @@ def doctor_horario_agregar(id):
             return redirect(url_for("doctor_asignar_cuidador", id=id))
         id_pc = row[0]
 
+        # Fetch existing shifts for this link and check for overlaps in Python
+        cur.execute("BEGIN")
+        cur.execute(
+            "CALL sp_gestion_horario('L', NULL, NULL, NULL, 'cur_hor_chk', %s)",
+            [id_pc]
+        )
+        cur.fetchone()  # consume OUT scalars
+        cur.execute("FETCH ALL FROM cur_hor_chk")
+        existing = cur.fetchall()
+        conn.commit()
+
+        from datetime import time as _time
+        def _t(s):
+            h, m = str(s).split(":")[:2]
+            return _time(int(h), int(m))
+
+        nueva_ini = _t(hora_inicio)
+        nueva_fin = _t(hora_fin)
+        conflicto = next(
+            (r for r in existing
+             if r[1] == dia and nueva_ini < _t(str(r[3])) and nueva_fin > _t(str(r[2]))),
+            None
+        )
+        if conflicto:
+            flash(
+                f"Traslape de horario: ya existe un turno el {dia} "
+                f"de {conflicto[2]} a {conflicto[3]}.",
+                "danger"
+            )
+            cur.close(); conn.close()
+            return redirect(url_for("doctor_asignar_cuidador", id=id))
+
         cur.execute("BEGIN")
         cur.execute(
             "CALL sp_gestion_horario('I', NULL, NULL, NULL, 'cur_hor_i', %s, %s, %s, %s)",
@@ -1001,17 +1133,28 @@ def doctor_receta_desde_lista():
                 hora   = hora_lst[i]
                 unidad = int(unidad_lst[i])
             except (IndexError, ValueError):
+                flash(f"Medicamento {i+1}: datos incompletos.", "warning")
                 continue
             cur_rxm = f"cur_rxmed_lista_{i}"
-            cur.execute("BEGIN")
-            cur.execute(
-                f"CALL sp_agregar_receta_med(NULL, NULL, NULL, '{cur_rxm}', %s, %s, %s, %s, %s, %s, %s)",
-                [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
-            )
-            p_id_rm, p_ok_m, p_msg_m, _ = cur.fetchone()
-            conn.commit()
-            if p_ok_m != 1:
-                flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
+            try:
+                cur.execute("BEGIN")
+                cur.execute(
+                    f"CALL sp_agregar_receta_med(NULL, NULL, NULL, '{cur_rxm}', %s, %s, %s, %s, %s, %s, %s)",
+                    [p_id_rx, int(mid), dosis, freq, tol, hora, unidad],
+                )
+                row_m   = cur.fetchone()
+                p_id_rm = row_m[0] if row_m else None
+                p_ok_m  = row_m[1] if row_m else -99
+                p_msg_m = row_m[2] if row_m else "Sin respuesta del SP"
+                cur.execute(f"FETCH ALL FROM {cur_rxm}")
+                if p_ok_m != 1:
+                    conn.rollback()
+                    flash(f"Medicamento {i+1}: {p_msg_m}", "warning")
+                    continue
+                conn.commit()
+            except Exception as em:
+                conn.rollback()
+                flash(f"Medicamento {i+1}: {em}", "warning")
                 continue
             uid = nfc_uids[i] if i < len(nfc_uids) else ''
             if uid.strip():
@@ -1080,10 +1223,18 @@ def doctor_recetas():
         conn.commit()
         medicamentos = [(r[0], r[1], r[3]) for r in rows_m]
 
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_unidades_dosis('cur_unis')")
+        cur.execute("FETCH ALL FROM cur_unis")
+        rows_u = cur.fetchall()
+        conn.commit()
+        # cols: id_unidad[0], abreviatura[1], descripcion[2]
+        unidades = [(r[0], r[1], r[2]) for r in rows_u]
+
         cur.close(); conn.close()
     except Exception as e:
         flash(f"Error al cargar recetas: {e}", "danger")
-    unidades = [(1, 'mg'), (2, 'ml'), (3, 'mcg'), (4, 'UI'), (5, 'comp')]
+        unidades = []
     return render_template("doctor/recetas.html",
         recetas=list(recetas.values()),
         pacientes=pacientes,

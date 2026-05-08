@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Mi Horario Semanal{% endblock %}
+{% block page_title %}Mi Horario Semanal{% endblock %}
+{% block content %}
+
+<div style="margin-bottom:20px;">
+  <p style="font-size:14px;color:#5D6D7E;">{{ session['nombre'] }}</p>
+</div>
+
+{% set LABELS = {
+  "lunes":     "Lun",
+  "martes":    "Mar",
+  "miercoles": "Mié",
+  "jueves":    "Jue",
+  "viernes":   "Vie",
+  "sabado":    "Sáb",
+  "domingo":   "Dom"
+} %}
+
+<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+  <table style="width:100%;border-collapse:separate;border-spacing:6px;min-width:700px;">
+    <thead>
+      <tr>
+        {% for dia in ORDEN_DIAS %}
+        <th style="
+          padding:8px 6px;
+          font-size:12px;
+          font-weight:700;
+          text-transform:uppercase;
+          letter-spacing:.05em;
+          text-align:center;
+          color:{% if dia == dia_hoy %}#1ABC9C{% else %}#5D6D7E{% endif %};
+          border-bottom:2px solid {% if dia == dia_hoy %}#1ABC9C{% else %}transparent{% endif %};
+        ">{{ LABELS[dia] }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="vertical-align:top;">
+        {% for dia in ORDEN_DIAS %}
+        <td style="
+          padding:6px 4px;
+          min-width:96px;
+          background:{% if dia == dia_hoy %}rgba(26,188,156,.05){% else %}transparent{% endif %};
+          border-radius:8px;
+        ">
+          {% if semana[dia] %}
+            {% for turno in semana[dia] %}
+            <div style="
+              background:#fff;
+              border:1px solid #E5E9EF;
+              border-radius:8px;
+              padding:8px 10px;
+              margin-bottom:6px;
+              box-shadow:0 1px 3px rgba(0,0,0,.04);
+            ">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                {{ avatar(turno.foto_perfil or '', turno.paciente or '', 26) }}
+                <div style="font-size:12px;font-weight:600;color:#2C3E50;line-height:1.2;">
+                  {{ turno.paciente }}
+                </div>
+              </div>
+              <div style="font-size:11px;color:#5D6D7E;font-family:monospace;">
+                {{ turno.hora_ini }} – {{ turno.hora_fin }}
+              </div>
+              {% if turno.es_principal %}
+              <div style="margin-top:4px;">
+                <span style="
+                  display:inline-block;padding:1px 7px;border-radius:999px;
+                  font-size:10px;font-weight:600;
+                  background:rgba(243,156,18,.15);color:#F39C12;
+                ">★ Principal</span>
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <div style="text-align:center;color:#C0C8D2;font-size:18px;padding:16px 0;">—</div>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% endblock %}

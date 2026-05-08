@@ -72,6 +72,7 @@
       <a href="{{ url_for('doctor_configuracion') }}" class="nav-item"><i data-lucide="settings" class="nav-icon"></i>Configuracion</a>
     {% else %}
       <a href="{{ url_for('cuidador_home') }}"               class="nav-item"><i data-lucide="home"       class="nav-icon"></i>Inicio</a>
+      <a href="{{ url_for('cuidador_horario') }}"            class="nav-item"><i data-lucide="calendar"   class="nav-icon"></i>Mi horario</a>
       <a href="{{ url_for('cuidador_historial') }}"          class="nav-item"><i data-lucide="clock"      class="nav-icon"></i>Historial NFC</a>
       <a href="{{ url_for('cuidador_grafica_adherencia') }}" class="nav-item"><i data-lucide="bar-chart-2" class="nav-icon"></i>Mi gráfica</a>
       <a href="{{ url_for('cuidador_alertas') }}"            class="nav-item"><i data-lucide="bell"       class="nav-icon"></i>Alertas {% if alertas_badge > 0 %}<span class="nav-badge">{{ alertas_badge }}</span>{% endif %}</a>
