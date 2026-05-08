@@ -1,8 +1,10 @@
-import os
 import traceback
 from datetime import datetime, timedelta, timezone
 
 from pymongo import MongoClient
+
+_MONGO_URI = "mongodb://localhost:27017/"
+_MONGO_DB  = "medinfc_mongo"
 
 _mongo_client = None
 
@@ -10,8 +12,8 @@ _mongo_client = None
 def get_mongo_db():
     global _mongo_client
     if _mongo_client is None:
-        _mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017/"))
-    return _mongo_client[os.getenv("MONGO_DB", "medinfc_mongo")]
+        _mongo_client = MongoClient(_MONGO_URI)
+    return _mongo_client[_MONGO_DB]
 
 
 # ─── Lectura: gráficas ───────────────────────────────────────────────────────
