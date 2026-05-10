@@ -3,8 +3,8 @@
 {% block page_title %}Riesgo de Omisión{% endblock %}
 
 {% block content %}
-<!-- Filtros -->
-<div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+<!-- Filtros de racha + búsqueda -->
+<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
   <a href="{{ url_for('doctor_riesgo_omision', activas=1) }}"
      class="btn btn-sm {% if solo_activas %}btn-primary{% else %}btn-ghost{% endif %}">
     Solo activas
@@ -13,6 +13,10 @@
      class="btn btn-sm {% if not solo_activas %}btn-primary{% else %}btn-ghost{% endif %}">
     Todas
   </a>
+  <div class="search-bar" style="flex:1;min-width:200px;max-width:360px;">
+    <i data-lucide="search" class="search-icon" style="width:16px;height:16px;"></i>
+    <input id="search-paciente" class="form-control" placeholder="Buscar paciente..."/>
+  </div>
 </div>
 
 {% macro nivel_badge(n) %}
@@ -30,9 +34,9 @@
         <th>Paciente</th><th>Medicamento</th><th>Días consecutivos</th>
         <th>Nivel riesgo</th><th>Activa</th><th>Última omisión hace</th>
       </tr></thead>
-      <tbody>
+      <tbody id="tabla-body">
         {% for f in filas %}
-        <tr data-searchable>
+        <tr data-paciente="{{ f.paciente | lower }}">
           <td style="font-weight:500;">{{ f.paciente }}</td>
           <td style="font-size:13px;color:#5D6D7E;">{{ f.medicamento }}</td>
           <td style="font-weight:700;color:#E74C3C;">{{ f.dias_consecutivos }}</td>
@@ -52,6 +56,9 @@
       </tbody>
     </table>
   </div>
+  <p id="empty-search" style="display:none;font-size:14px;color:#9CA3AF;padding:16px 20px;">
+    No hay resultados para esa búsqueda.
+  </p>
   {% else %}
   <div class="card-body">
     <div class="empty-state">
@@ -62,45 +69,126 @@
   {% endif %}
 </div>
 
-{% set top10 = filas[:10] %}
-{% if top10 %}
+{% if filas %}
 <div class="card">
-  <div class="card-header"><h3>Top 10 — Días consecutivos</h3></div>
+  <div class="card-header"><h3 id="chart-title">Top 10 — Días consecutivos</h3></div>
   <div class="card-body">
-    <div id="chart-riesgo" style="height:{{ [top10|length * 42, 180]|max }}px;"></div>
+    <div id="chart-riesgo" style="min-height:180px;"></div>
   </div>
 </div>
+{% endif %}
+
+<!-- Serializar datos para JS -->
+{% if filas %}
+<script id="rows-data" type="application/json">
+[{% for f in filas %}{"paciente":{{ f.paciente | tojson }},"medicamento":{{ f.medicamento | tojson }},"dias":{{ f.dias_consecutivos }},"nivel":{{ f.nivel_riesgo | tojson }},"activa":{{ 'true' if f.racha_activa else 'false' }},"desde":{{ (f.dias_desde_ultima_omision | string) | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]
+</script>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
 lucide.createIcons();
-{% if filas %}
-{% set top10 = filas[:10] %}
-var categorias = {{ top10 | map(attribute='paciente') | list | tojson }};
-var valores     = {{ top10 | map(attribute='dias_consecutivos') | list | tojson }};
-var colores = [
-  {% for f in top10 %}
-  '{% if f.nivel_riesgo == "CRÍTICO" %}#E74C3C{% elif f.nivel_riesgo == "ALTO" %}#F39C12{% else %}#AEB6BF{% endif %}'
-  {% if not loop.last %},{% endif %}
-  {% endfor %}
-];
 
-Highcharts.chart('chart-riesgo', {
-  chart: { type: 'bar', backgroundColor: 'transparent' },
-  title: { text: null },
-  xAxis: { categories: categorias, labels: { style: { color: '#5D6D7E', fontSize: '12px' } } },
-  yAxis: { min: 0, title: { text: 'Días consecutivos', style: { color: '#5D6D7E' } },
-           labels: { style: { color: '#5D6D7E' } } },
-  tooltip: { valueSuffix: ' días' },
-  legend: { enabled: false },
-  plotOptions: { bar: { borderRadius: 3, colorByPoint: true,
-    dataLabels: { enabled: true, style: { fontSize: '11px', textOutline: 'none', color: '#5D6D7E' } } } },
-  colors: colores,
-  series: [{ name: 'Días', data: valores }],
-  credits: { enabled: false }
-});
+{% if filas %}
+var ROWS_DATA = JSON.parse(document.getElementById('rows-data').textContent);
+var chartInstance = null;
+
+function colorFor(row) {
+  if (!row.activa) return '#CBD5E0';
+  if (row.nivel === 'CRÍTICO') return '#E74C3C';
+  if (row.nivel === 'ALTO')    return '#F39C12';
+  return '#95A5A6';
+}
+
+function buildChart(rows) {
+  var top = rows.slice(0, 10);
+  var cats   = top.map(function(r){ return r.paciente + ' — ' + r.medicamento; });
+  var values = top.map(function(r){ return r.dias; });
+  var colors = top.map(function(r){ return colorFor(r); });
+  var tooltipRows = top;
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  var h = Math.max(top.length * 44, 180);
+  document.getElementById('chart-riesgo').style.height = h + 'px';
+
+  chartInstance = Highcharts.chart('chart-riesgo', {
+    chart: { type: 'bar', backgroundColor: 'transparent' },
+    title: { text: null },
+    xAxis: {
+      categories: cats,
+      labels: { style: { color: '#5D6D7E', fontSize: '12px' } }
+    },
+    yAxis: {
+      min: 0,
+      title: { text: 'Días consecutivos', style: { color: '#5D6D7E' } },
+      labels: { style: { color: '#5D6D7E' } }
+    },
+    tooltip: {
+      formatter: function() {
+        var r = tooltipRows[this.point.index];
+        return '<b>' + r.paciente + '</b><br/>' +
+               r.medicamento + '<br/>' +
+               '<b>' + r.dias + '</b> días consecutivos<br/>' +
+               'Nivel: <b>' + r.nivel + '</b><br/>' +
+               'Estado: <b>' + (r.activa ? 'Activa' : 'Cerrada') + '</b>';
+      }
+    },
+    legend: { enabled: false },
+    plotOptions: {
+      bar: {
+        borderRadius: 3,
+        colorByPoint: true,
+        dataLabels: {
+          enabled: true,
+          style: { fontSize: '11px', textOutline: 'none', color: '#5D6D7E' }
+        }
+      }
+    },
+    colors: colors,
+    series: [{ name: 'Días', data: values }],
+    credits: { enabled: false }
+  });
+}
+
+function applyFilter() {
+  var q = document.getElementById('search-paciente').value.toLowerCase().trim();
+  var rows = document.querySelectorAll('#tabla-body tr');
+  var visible = 0;
+  var visibleData = [];
+
+  rows.forEach(function(tr) {
+    var name = tr.getAttribute('data-paciente') || '';
+    var show = !q || name.indexOf(q) !== -1;
+    tr.style.display = show ? '' : 'none';
+    if (show) {
+      visible++;
+      // find matching ROWS_DATA entry by index
+    }
+  });
+
+  // Collect visible ROWS_DATA entries (same order as table rows)
+  var allRows = Array.from(document.querySelectorAll('#tabla-body tr'));
+  var visRows = [];
+  allRows.forEach(function(tr, i) {
+    if (tr.style.display !== 'none') visRows.push(ROWS_DATA[i]);
+  });
+
+  document.getElementById('empty-search').style.display = (visible === 0) ? '' : 'none';
+
+  var title = q
+    ? 'Top 10 — "' + document.getElementById('search-paciente').value + '"'
+    : 'Top 10 — Días consecutivos';
+  document.getElementById('chart-title').textContent = title;
+
+  buildChart(visRows);
+}
+
+document.getElementById('search-paciente').addEventListener('input', applyFilter);
+
+// Initial chart render
+buildChart(ROWS_DATA);
 {% endif %}
 </script>
 {% endblock %}
